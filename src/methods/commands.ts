@@ -71,3 +71,19 @@ export async function WebsitesCommand(body: DiscordInteraction, response: Crafte
     },
   });
 }
+
+export async function SourceCommand(body: DiscordInteraction, response: CraftedResponse) {
+  return response.status(200).send({
+    type: 4,
+    data: {
+      flags: 1 << 6,
+      embeds: [
+        {
+          title: 'Shoko Makinohara Source',
+          description: `This bot runs via a cloudflare worker, the source can be found on my github [here](https://github.com/dustinrouillard/shoko-makinohara-lanyard)`,
+          color: 0x298938,
+        },
+      ],
+    },
+  });
+}
