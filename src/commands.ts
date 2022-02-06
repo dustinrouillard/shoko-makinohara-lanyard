@@ -1,4 +1,4 @@
-import { UserCommand, CardsCommand, WebsitesCommand, ProjectsCommand, SourceCommand } from './methods/commands';
+import { UserCommand, CardsCommand, WebsitesCommand, ProjectsCommand, SourceCommand, BannerCommand } from './methods/commands';
 
 export const Commands = [
   { command: 'user', function: UserCommand },
@@ -6,4 +6,6 @@ export const Commands = [
   { command: 'projects', function: ProjectsCommand },
   { command: 'websites', function: WebsitesCommand },
   { command: 'source', function: SourceCommand },
+  { command: 'banners', function: BannerCommand },
+  { command: 'bios', function: BannerCommand },
 ];

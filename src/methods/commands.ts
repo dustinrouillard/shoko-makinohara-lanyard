@@ -87,3 +87,19 @@ export async function SourceCommand(body: DiscordInteraction, response: CraftedR
     },
   });
 }
+
+export async function BannerCommand(body: DiscordInteraction, response: CraftedResponse) {
+  return response.status(200).send({
+    type: 4,
+    data: {
+      flags: 1 << 6,
+      embeds: [
+        {
+          title: 'Getting banners or bios',
+          description: `**Bios**\nDiscord doesn't return bio in presence data for anyone, or in the API to bots for privacy reasons\n\n**Banners**\nDiscord doesn't return the banner for the user in the presence data, but they do return it in the API for bots\n\nHowever these limitations can be bypassed on a per-use basis using an api that [Dustin](https://twitter.com/dustinrouillard) made [dcdn worker](https://dcdn.dstn.to/gist)\n*This cannot 100% reliable for the user profile as it's not using an officially supported method*`,
+          color: 0x102392,
+        },
+      ],
+    },
+  });
+}
