@@ -2,6 +2,7 @@ import { CraftedResponse } from './types/Routes';
 import { pullLanyardReadme } from './utils/github';
 import { Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction } from './types/Interaction';
+import { getAllStats, trackCommand } from './utils/stats';
 
 export interface Command {
   command: string | string[];
@@ -58,6 +59,14 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'stats',
+    embed: async () => ({
+      title: 'Shoko Makinohara Command Stats',
+      description: `Current command usage statistics\n\n${(await getAllStats()).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
+      color: 0x849203,
+    }),
+  },
+  {
     command: ['banners', 'bios'],
     embed: () => ({
       title: 'Getting banners or bios',
@@ -70,6 +79,8 @@ export const Commands: Command[] = [
 export async function processCommand(name: string, body: DiscordInteraction, response: CraftedResponse) {
   const command = Commands.find((cmd) => (typeof cmd.command == 'object' ? cmd.command.includes(name) : cmd.command == name));
   if (!command) return response.status(400).send('invalid request');
+
+  await trackCommand(name);
 
   if (command.function) {
     return await command.function(body, response);

@@ -7,3 +7,5 @@ account_id = "3e4e267fb0f575f02c3d6ecd0c65f3cd"
 name = "shoko-discord"
 routes = ["shoko-discord.dstn.to/*"]
 workers_dev = false
+
+kv_namespaces = [{ binding = "Storage", id = "b7938eb49491446b9b84a2ea5d2ebfef" }]
