@@ -3,6 +3,7 @@ import { pullLanyardReadme } from './utils/github';
 import { Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction } from './types/Interaction';
 import { getAllStats, trackCommand } from './utils/stats';
+import { fetchLanyardUser } from './utils/lanyard';
 
 export interface Command {
   command: string | string[];
@@ -16,9 +17,21 @@ export const Commands: Command[] = [
     command: 'user',
     embed: (body: DiscordInteraction) => ({
       title: 'Discord User ID',
-      description: `Your Discord User ID is \`${body.member.user.id}\``,
+      description: `Your Discord User ID is \`${body.member.user.id}\`\n\nLanyard API URL\n[api.lanyard.rest/v1/users/${body.member.user.id}](https://api.lanyard.rest/v1/users/${body.member.user.id})`,
       color: 0x272783,
     }),
+  },
+  {
+    command: 'kv',
+    embed: async (body: DiscordInteraction) => {
+      const user = body.data.options?.find(item => item.name == 'user')?.value || body.member.user.id;
+      const lanyard = await fetchLanyardUser(user);
+      return {
+        title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
+        description: `Current Lanyard K/V Items\n\n\`\`\`json\n${lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'}\n\`\`\`\nTo access a key within a script the path is\n\`.data.kv.KEY_NAME\`\n\nYou can set K/V items by reading the help with \`.kv\``,
+        color: 0xff9823,
+      }
+    }
   },
   {
     command: 'cards',

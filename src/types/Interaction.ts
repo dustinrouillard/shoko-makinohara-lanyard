@@ -16,6 +16,13 @@ export interface Data {
   id: string;
   name: string;
   type: number;
+  options?: CommandOptions[];
+}
+
+export interface CommandOptions {
+  name: string;
+  type: number;
+  value: string;
 }
 
 export interface Member {
