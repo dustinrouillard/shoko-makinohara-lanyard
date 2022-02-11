@@ -19,7 +19,9 @@ export const Commands: Command[] = [
     description: 'Returns list of commands',
     embed: () => ({
       title: 'Shoko Makinohara Help',
-      description: `Commands\n${Commands.map(command => `${typeof command.command == 'string' ? `\`/${command.command}\`` : `${command.command.map(name => `\`/${name}\``).join(', ')}`} - ${command.description}`).join('\n')}`,
+      description: `Commands\n${Commands.map(
+        (command) => `${typeof command.command == 'string' ? `\`/${command.command}\`` : `${command.command.map((name) => `\`/${name}\``).join(', ')}`} - ${command.description}`,
+      ).join('\n')}`,
       color: 0xef2123,
     }),
   },
@@ -36,14 +38,25 @@ export const Commands: Command[] = [
     command: 'kv',
     description: 'Returns users Lanyard K/V pairs',
     embed: async (body: DiscordInteraction) => {
-      const user = body.data.options?.find(item => item.name == 'user')?.value || body.member.user.id;
+      const user = body.data.options?.find((item) => item.name == 'user')?.value || body.member.user.id;
       const lanyard = await fetchLanyardUser(user);
       return {
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
-        description: `Current Lanyard K/V Items\n\n\`\`\`json\n${lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'}\n\`\`\`\nTo access a key within a script the path is\n\`.data.kv.KEY_NAME\`\n\nYou can set K/V items by reading the help with \`.kv\``,
+        description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
+          lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'
+        }\n\`\`\`\nTo access a key within a script the path is\n\`.data.kv.KEY_NAME\`\n\nYou can set K/V items by reading the help with \`.kv\``,
         color: 0xff9823,
-      }
-    }
+      };
+    },
+  },
+  {
+    command: 'kvapi',
+    description: "Returns information about interacting with Lanyard's K/V with the API",
+    embed: (body: DiscordInteraction) => ({
+      title: 'Lanyard K/V API',
+      description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${body.member.user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${body.member.user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
+      color: 0xfeb321,
+    }),
   },
   {
     command: 'cards',
