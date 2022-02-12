@@ -10,6 +10,8 @@ export interface Command {
   command: string | string[];
   description: string;
   content?: string;
+  ephemeral?: boolean;
+  post_channels?: string[];
   embed?: (body: DiscordInteraction) => Partial<Embed> | Promise<Partial<Embed>>;
   function?: (body: DiscordInteraction, response: CraftedResponse) => Promise<void>;
 }
@@ -37,6 +39,7 @@ export const Commands: Command[] = [
   },
   {
     command: 'kv',
+    post_channels: ['911712979291086919', '927757958010503171'],
     description: 'Returns users Lanyard K/V pairs',
     embed: async (body: DiscordInteraction) => {
       const user = body.data.options?.find((item) => item.name == 'user')?.value || body.member.user.id;
@@ -147,13 +150,17 @@ export async function processCommand(name: string, body: DiscordInteraction, res
 
   await trackCommand(name);
 
+  const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
+  const post_channel = command.post_channels && command.post_channels.includes(body.channel_id);
+  const flags = post_channel ? null : ephemeral ? MessageFlags.Ephemeral : null;
+
   if (command.function) {
     return await command.function(body, response);
   } else if (command.embed) {
     return response.status(200).send({
       type: 4,
       data: {
-        flags: MessageFlags.Ephemeral,
+        flags,
         content: command.content,
         embeds: [await command.embed(body)],
       },
@@ -162,7 +169,7 @@ export async function processCommand(name: string, body: DiscordInteraction, res
     return response.status(200).send({
       type: 4,
       data: {
-        flags: MessageFlags.Ephemeral,
+        flags,
         content: command.content,
       },
     });
