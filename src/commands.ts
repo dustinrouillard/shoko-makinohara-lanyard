@@ -4,6 +4,7 @@ import { pullLanyardReadme } from './utils/github';
 import { Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction } from './types/Interaction';
 import { getAllStats, trackCommand } from './utils/stats';
+import { msToMinSeconds } from './utils/time';
 
 export interface Command {
   command: string | string[];
@@ -57,6 +58,26 @@ export const Commands: Command[] = [
       description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${body.member.user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${body.member.user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
       color: 0xfeb321,
     }),
+  },
+  {
+    command: 'spotify',
+    description: 'Returns information about spotify data from Lanyard',
+    embed: async (body: DiscordInteraction) => {
+      const lanyard = await fetchLanyardUser(body.member.user.id);
+      const currentTime = new Date().getTime();
+
+      return {
+        title: 'Lanyard K/V API',
+        description: `**Calculating current position and song length using the data timestamps provided by your Lanyard data**\n\nAll you have to do is a bit of math\n\`spotify.timestamps.end - spotify.timestamps.start\` = song length\n\`currentTimeInMs - spotify.timestamps.start\` = current position\n\nThese values are in milliseconds so you'll need to convert them using more math, example for calculating this in javascript seen [here](https://gist.github.com/dustinrouillard/8140fd47c5900d4421637b098b6d92c0)${
+          lanyard?.data?.spotify
+            ? `\n\n**Your current listening data**\n\`${lanyard.data.spotify.song} by ${lanyard.data.spotify.artist}\`\n\`Time: ${msToMinSeconds(
+                currentTime - lanyard.data.spotify.timestamps.start,
+              )} - ${msToMinSeconds((lanyard.data.spotify.timestamps.end || 0) - lanyard.data.spotify.timestamps.start)}\``
+            : '\n\n*Start listening to music to see the timestamps here*'
+        }`,
+        color: 0xb21332,
+      };
+    },
   },
   {
     command: 'cards',
