@@ -1,9 +1,9 @@
 import { CraftedResponse } from './types/Routes';
 import { fetchLanyardUser } from './utils/lanyard';
 import { pullLanyardReadme } from './utils/github';
-import { Embed, MessageFlags } from './types/Message';
-import { DiscordInteraction } from './types/Interaction';
-import { getAllStats, trackCommand } from './utils/stats';
+import { Component, ComponentType, Embed, MessageFlags } from './types/Message';
+import { DiscordInteraction, User } from './types/Interaction';
+import { getAllStats, getGuildStats, trackCommand } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 
 export interface Command {
@@ -12,8 +12,9 @@ export interface Command {
   content?: string;
   ephemeral?: boolean;
   post_channels?: string[];
-  embed?: (body: DiscordInteraction) => Partial<Embed> | Promise<Partial<Embed>>;
-  function?: (body: DiscordInteraction, response: CraftedResponse) => Promise<void>;
+  embed?: (body: DiscordInteraction, user: User) => Partial<Embed> | Promise<Partial<Embed>>;
+  components?: (body: DiscordInteraction, user: User) => Partial<Component[]> | Promise<Partial<Component[]>>;
+  function?: (body: DiscordInteraction, user: User, response: CraftedResponse) => Promise<void>;
 }
 
 export const Commands: Command[] = [
@@ -31,9 +32,9 @@ export const Commands: Command[] = [
   {
     command: 'user',
     description: 'Returns your Discord User ID',
-    embed: (body: DiscordInteraction) => ({
+    embed: (body: DiscordInteraction, user: User) => ({
       title: 'Discord User ID',
-      description: `Your Discord User ID is \`${body.member.user.id}\`\n\nLanyard API URL\n[api.lanyard.rest/v1/users/${body.member.user.id}](https://api.lanyard.rest/v1/users/${body.member.user.id})`,
+      description: `Your Discord User ID is \`${user.id}\`\n\nLanyard API URL\n[api.lanyard.rest/v1/users/${user.id}](https://api.lanyard.rest/v1/users/${user.id})`,
       color: 0x272783,
     }),
   },
@@ -41,9 +42,9 @@ export const Commands: Command[] = [
     command: 'kv',
     post_channels: ['911712979291086919', '927757958010503171'],
     description: 'Returns users Lanyard K/V pairs',
-    embed: async (body: DiscordInteraction) => {
-      const user = body.data.options?.find((item) => item.name == 'user')?.value || body.member.user.id;
-      const lanyard = await fetchLanyardUser(user);
+    embed: async (body: DiscordInteraction, user: User) => {
+      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+      const lanyard = await fetchLanyardUser(id);
       return {
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
         description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
@@ -56,17 +57,17 @@ export const Commands: Command[] = [
   {
     command: 'kvapi',
     description: "Returns information about interacting with Lanyard's K/V with the API",
-    embed: (body: DiscordInteraction) => ({
+    embed: (body: DiscordInteraction, user: User) => ({
       title: 'Lanyard K/V API',
-      description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${body.member.user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${body.member.user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
+      description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
       color: 0xfeb321,
     }),
   },
   {
     command: 'spotify',
     description: 'Returns information about spotify data from Lanyard',
-    embed: async (body: DiscordInteraction) => {
-      const lanyard = await fetchLanyardUser(body.member.user.id);
+    embed: async (body: DiscordInteraction, user: User) => {
+      const lanyard = await fetchLanyardUser(user.id);
       const currentTime = new Date().getTime();
 
       return {
@@ -85,9 +86,9 @@ export const Commands: Command[] = [
   {
     command: 'cards',
     description: 'Returns Lanyard visualizer/card contributions from the community',
-    embed: (body: DiscordInteraction) => ({
+    embed: (body: DiscordInteraction, user: User) => ({
       title: 'Lanyard Cards and Visualizers',
-      description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [Your card](https://lanyard.cnrad.dev/api/${body.member.user.id})\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [Your card](https://lanyard-visualizer.netlify.app/user/${body.member.user.id})\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
+      description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [Your card](https://lanyard.cnrad.dev/api/${user.id})\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [Your card](https://lanyard-visualizer.netlify.app/user/${user.id})\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
       color: 0x893012,
     }),
   },
@@ -125,10 +126,28 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'invite',
+    description: 'Returns bot invite for Shoko Makinohara',
+    embed: () => ({
+      title: 'Invite Shoko Makinohara',
+      description: `You can invite this bot to your server if you want, hopefully in the future it'll be able to do more cool things with Lanyard, such as manging the K/V`,
+      color: 0x298938,
+    }),
+    components: () => [
+      {
+        type: ComponentType.Button,
+        style: 5,
+        label: 'Invite Bot',
+        url: 'https://discord.com/api/oauth2/authorize?client_id=911655061594202192&permissions=0&scope=applications.commands%20bot',
+      },
+    ],
+  },
+  {
     command: 'stats',
-    description: 'Shoko Makinohara Command Statistics',
+    description: 'Shoko Makinohara Statistics',
     embed: async () => ({
-      title: 'Shoko Makinohara Command Stats',
+      title: 'Shoko Makinohara Stats',
+      footer: { text: `Working in ${(await getGuildStats()).toLocaleString()} guilds` },
       description: `Current command usage statistics\n\n${(await getAllStats()).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
       color: 0x849203,
     }),
@@ -152,17 +171,21 @@ export async function processCommand(name: string, body: DiscordInteraction, res
 
   const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
   const post_channel = command.post_channels && command.post_channels.includes(body.channel_id);
-  const flags = post_channel ? null : ephemeral ? MessageFlags.Ephemeral : null;
+  const flags = post_channel || !body.channel_id ? null : ephemeral ? MessageFlags.Ephemeral : null;
+
+  const user = (body.member?.user || body.user) as User;
+  const components = command.components ? [{ type: 1, components: await command.components(body, user) }] : undefined;
 
   if (command.function) {
-    return await command.function(body, response);
+    return await command.function(body, user, response);
   } else if (command.embed) {
     return response.status(200).send({
       type: 4,
       data: {
         flags,
         content: command.content,
-        embeds: [await command.embed(body)],
+        embeds: [await command.embed(body, user)],
+        components,
       },
     });
   } else if (command.content) {
@@ -171,6 +194,7 @@ export async function processCommand(name: string, body: DiscordInteraction, res
       data: {
         flags,
         content: command.content,
+        components,
       },
     });
   } else {

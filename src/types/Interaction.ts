@@ -6,7 +6,8 @@ export interface DiscordInteraction {
   guild_locale: string;
   id: string;
   locale: string;
-  member: Member;
+  user?: User;
+  member?: Member;
   token: string;
   type: number;
   version: number;
@@ -39,7 +40,6 @@ export interface Member {
   roles: string[];
   user: User;
 }
-
 export interface User {
   avatar: string;
   discriminator: string;

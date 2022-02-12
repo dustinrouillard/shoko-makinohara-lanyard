@@ -22,3 +22,26 @@ export async function getAllStats(): Promise<{ name: string; stat: number }[]> {
   }
   return cmds;
 }
+
+export async function getGuildStats(): Promise<number> {
+  const current = Number(await Storage.get(`stats/guilds`)) || 0;
+  return current;
+}
+
+export async function trackNewGuild(): Promise<number> {
+  let current = Number(await Storage.get(`stats/guilds`));
+  if (!current) current = 1;
+  else current = current + 1;
+
+  await Storage.put(`stats/guilds`, current.toString());
+  return current;
+}
+
+export async function trackLostGuild(): Promise<number> {
+  let current = Number(await Storage.get(`stats/guilds`));
+  if (!current) current = 0;
+  else current = current - 1;
+
+  await Storage.put(`stats/guilds`, current.toString());
+  return current;
+}

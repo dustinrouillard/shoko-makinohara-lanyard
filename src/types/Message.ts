@@ -47,3 +47,24 @@ export interface Footer {
 export interface Image {
   url: string;
 }
+
+export enum ComponentType {
+  ActionRow = 1,
+  Button = 2,
+  SelectMenu = 3,
+  TextInput = 4,
+}
+
+export interface MessageComponent {
+  type: ComponentType;
+  components: Component[];
+}
+
+export interface Component {
+  type: ComponentType;
+  label: string;
+  style: number;
+  custom_id?: string;
+  url?: string;
+  emoji?: string;
+}
