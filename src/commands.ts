@@ -49,7 +49,7 @@ export const Commands: Command[] = [
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
         description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
           lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'
-        }\n\`\`\`\nTo access a key within a script the path is\n\`.data.kv.KEY_NAME\`\n\nYou can set K/V items by reading the help with \`.kv\``,
+        }\n\`\`\`\nTo access a key within a script the json path is\n\`.data.kv.KEY_NAME\`\nwhen using the socket it will be \`.d.kv.KEY_NAME\`\nThe \`.\` referencing the root of your JSON response\n\nYou can set K/V items by reading the help with \`.kv\``,
         color: 0xff9823,
       };
     },
