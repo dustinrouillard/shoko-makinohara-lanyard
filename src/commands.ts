@@ -66,9 +66,11 @@ export const Commands: Command[] = [
   {
     command: 'assets',
     description: 'Learn how to handle various assets',
-    embed: () => ({
+    embed: async (_, user) => ({
       title: 'Discord Assets',
-      description: `Discord returns various things for their assets, however they're easy to convert to the cdn url so you can use them.\nYou can also read the discord developer docs page for [image formatting](https://discord.com/developers/docs/reference#image-formatting).\n\n**Avatars**\nThe API returns the hash of the avatar, which you have to combine with the ID to get the image URL\n\`https://cdn.discordapp.com/avatars/<USER_ID>/<HASH>\`\n\n**Activity Icons**\nActivity icons vary a little bit, for most of them they don't have a hash, and you can use the following structure\n\`https://cdn.discordapp.com/app-icons/<APP_ID>/<ASSET_ID>\`\n\nFor some activities that don't have an assets object (These are normally manually added games or games without rich presences) they don't have an easy way without a third party service to get their asset hash, however <@156114103033790464> has made a worker for this, and you can learn about it by running \`/banners\` or [here](https://dcdn.dstn.to/gist)\n\nFor all of these you can include a file extension \`.png .webp .gif .jpeg\` and or a \`size\` parameter`,
+      description: `Discord returns various things for their assets, however they're easy to convert to the cdn url so you can use them.\nYou can also read the discord developer docs page for [image formatting](https://discord.com/developers/docs/reference#image-formatting).\n\n**Avatars**\nThe API returns the hash of the avatar, which you have to combine with the ID to get the image URL\n\`https://cdn.discordapp.com/avatars/<USER_ID>/<HASH>\`\n\n**Activity Icons**\nActivity icons vary a little bit, for most of them they don't have a hash, and you can use the following structure\n\`https://cdn.discordapp.com/app-icons/<APP_ID>/<ASSET_ID>\`\n\nFor some activities that don't have an assets object (These are normally manually added games or games without rich presences) they don't have an easy way without a third party service to get their asset hash, however <@156114103033790464> has made a worker for this, and you can learn about it by running \`/banners\` or [here](https://dcdn.dstn.to/gist)\n\nFor all of these you can include a file extension \`.png .webp .gif .jpeg\` and or a \`size\` query param\n*Example: \`https://cdn.discordapp.com/avatars/${
+        user.id
+      }/${(await fetchLanyardUser(user.id))?.data?.discord_user.avatar}.png?size=512\`*`,
       color: 0x647322,
     }),
   },
