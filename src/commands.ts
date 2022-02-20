@@ -64,6 +64,15 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'react',
+    description: 'Usage instructions for React',
+    embed: (body: DiscordInteraction, user: User) => ({
+      title: 'Usage with React',
+      description: `Using Lanyard with a React site can be done in many different ways, but the easiest way would be to use the hook <@268798547439255572> made\n[use-lanyard](https://github.com/alii/use-lanyard)\n\n**Usage examples for the use-lanyard hook**\n\nUsing SWR (HTTP Polling):\n\`\`\`js\nimport { useLanyard } from 'use-lanyard';\n\nconst DISCORD_ID = '${user.id}';\n\nexport function Activity() {\n  const { data: activity } = useLanyard(DISCORD_ID);\n\n  return <>...</>;\n}\n\`\`\`\nUsing the socket **(Recommended)**\`\`\`js\nimport { useLanyardWs } from 'use-lanyard';\n\nconst DISCORD_ID = '${user.id}';\n\nexport function Activity() {\n  const activity = useLanyardWs(DISCORD_ID);\n\n  return <>...</>;\n}\n\`\`\`\nThis gives you the raw Lanyard API data as an object, meaning you can create a component for any of the data that Lanyard returns and it'll be always up to date with your presence data from discord.`,
+      color: 0x61dbfb,
+    }),
+  },
+  {
     command: 'assets',
     description: 'Learn how to handle various assets',
     embed: async (_, user) => ({
