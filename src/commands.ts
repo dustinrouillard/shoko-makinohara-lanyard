@@ -106,11 +106,18 @@ export const Commands: Command[] = [
   {
     command: 'cards',
     description: 'Returns Lanyard visualizer/card contributions from the community',
-    embed: (body: DiscordInteraction, user: User) => ({
-      title: 'Lanyard Cards and Visualizers',
-      description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [Your card](https://lanyard.cnrad.dev/api/${user.id})\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [Your card](https://lanyard-visualizer.netlify.app/user/${user.id})\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
-      color: 0x893012,
-    }),
+    embed: async (body: DiscordInteraction, user: User) => {
+      const lanyardProfileReadmeUsers: { count: number } = await fetch('https://lanyard.cnrad.dev/api/getUserCount').then((r) => r.json());
+      return {
+        title: 'Lanyard Cards and Visualizers',
+        description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [View Card](https://lanyard.cnrad.dev/api/${
+          user.id
+        }) \`Used by : ${lanyardProfileReadmeUsers.count.toLocaleString()} users\`\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [View Card](https://lanyard-visualizer.netlify.app/user/${
+          user.id
+        })\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
+        color: 0x893012,
+      };
+    },
   },
   {
     command: 'projects',
