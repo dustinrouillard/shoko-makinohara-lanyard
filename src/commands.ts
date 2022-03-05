@@ -64,6 +64,15 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'socket',
+    description: 'Returns information about using the Lanyard socket',
+    embed: (body: DiscordInteraction, user: User) => ({
+      title: 'Lanyard K/V API',
+      description: `The socket is best way to implement Lanyard\n\n**Opcodes**\n*0*: \`Event\`\n*1*: \`Hello\`\n*2*: \`Initialize\`\n*3*: \`Heartbeat\`\n\n**Sending the heartbeat**\nAfter you connect to the socket you should listen for \`OP 1\` which will contain the \`d\` object that looks like this.\n\`\`\`json\n{\n  "op":1,\n  "d":{\n    "heartbeat_interval":30000\n  }\n}\n\`\`\`\nYou'll want to use the \`heartbeat_interval\` property and send \`OP 3\` on this interval like so. \`{"op":3}\`\n\nAfter we've established sending our heartbeat, you'll want to send \`OP 2\` initialize to subscribe to presence events for your user, a list of users, or every user lanyard monitors.\n\n*Just one*: \`{"op":2,"d":{"subscribe_to_id":"ID"}}\`\n*Multiple*: \`{"op":2,"d":{"subscribe_to_ids":["ID","ID"]}}\`\n*All*: \`{"op":2,"d":{"subscribe_to_all":true}}\`\n\nYou will receive an event on \`OP 0\` which has a property called \`t\` which has the following events\n- \`INIT_STATE\`\n- \`PRESENCE_UPDATE\`\n\nOnce you send the subscribe data you will get \`OP 0\`, \`INIT_STATE\` which conatins the initial presence data of the users you subscribed to in one of two formats.\n\n**If you subscribed to one user**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n**If you subscribed to multiple users or all**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    "ID":{\n      ...presence data\n    }\n  }\n}\n\`\`\`\n\nYou then will receive \`OP 0\`, \`PRESENCE_UPDATE\` when any user you're subscribed to has a presence update.\n\`\`\`json\n{\n  "op":0,\n  "t":"PRESENCE_UPDATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n\n[Example in javascript](https://gist.github.com/dustinrouillard/2b2a2f7f18be5690f0c487c8a16fa707).`,
+      color: 0xabe221,
+    }),
+  },
+  {
     command: 'react',
     description: 'Usage instructions for React',
     embed: (body: DiscordInteraction, user: User) => ({
