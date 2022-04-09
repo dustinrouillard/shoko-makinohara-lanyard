@@ -1,7 +1,7 @@
 import { routes } from './routes';
 
 import { CraftedResponse, Method, ParsedRequest } from './types/Routes';
-import { Base } from './methods/base';
+import { NotFound } from './methods/notfound';
 
 addEventListener('fetch', (event) => {
   event.respondWith(
@@ -72,7 +72,7 @@ addEventListener('fetch', (event) => {
           if (!mw) return mw;
         }
 
-      route ? route.handler(req, res) : Base(req, res);
+      route ? route.handler(req, res) : NotFound(req, res);
     }),
   );
 });

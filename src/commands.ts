@@ -5,6 +5,7 @@ import { Component, ComponentType, Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction, User } from './types/Interaction';
 import { getAllStats, getGuildStats, trackCommand } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
+import { getValue, getValueIncrease } from './utils/metrics';
 
 export interface Command {
   command: string | string[];
@@ -62,6 +63,42 @@ export const Commands: Command[] = [
       description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
       color: 0xfeb321,
     }),
+  },
+  {
+    command: 'metrics',
+    description: 'Returns various metrics from Lanyard',
+    embed: async (body: DiscordInteraction) => {
+      try {
+        const monitored_users = await getValue('lanyard_monitored_users');
+        const connected_sessions = await getValue('lanyard_connected_sessions');
+        const presence_updates_hour = await getValueIncrease('lanyard_presence_updates', '1h');
+
+        return {
+          title: 'Lanyard Metrics',
+          fields: [
+            {
+              name: 'Monitored Users',
+              value: monitored_users.toLocaleString(),
+            },
+            {
+              name: 'Connected Socket Clients',
+              value: connected_sessions.toLocaleString(),
+            },
+            {
+              name: 'Presence Updates (1 hour)',
+              value: presence_updates_hour.toLocaleString(),
+            },
+          ],
+          color: 0xbe2cbe,
+        };
+      } catch (error) {
+        console.error(error);
+        return {
+          title: 'Failed',
+          description: 'failed to run command',
+        };
+      }
+    },
   },
   {
     command: 'socket',
