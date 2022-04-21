@@ -6,6 +6,7 @@ import { DiscordInteraction, User } from './types/Interaction';
 import { getAllStats, getGuildStats, trackCommand } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
+import { getDiscordUser, getLanyardMember, idToTimestamp } from './utils/discord';
 
 export interface Command {
   command: string | string[];
@@ -38,6 +39,72 @@ export const Commands: Command[] = [
       description: `Your Discord User ID is \`${user.id}\`\n\nLanyard API URL\n[api.lanyard.rest/v1/users/${user.id}](https://api.lanyard.rest/v1/users/${user.id})`,
       color: 0x272783,
     }),
+  },
+  {
+    command: 'who',
+    description: 'Returns your Lanyard/Discord user info',
+    post_channels: ['911712979291086919', '927757958010503171'],
+    embed: async (body: DiscordInteraction, user: User) => {
+      try {
+        const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+        const lanyard = await fetchLanyardUser(id);
+        const discord = await getDiscordUser(id);
+
+        if (!lanyard || !discord) throw { code: 'no_lanyard_user' };
+
+        const member = await getLanyardMember(id);
+        const joined = new Date(member.joined_at).getTime();
+
+        return {
+          title: 'Lanyard Whois',
+          author: {
+            name: `${discord.username}#${discord.discriminator}`,
+            icon_url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}`,
+          },
+          footer: { text: `ID: ${discord.id}` },
+          fields: [
+            {
+              name: '⏲️ Monitored Since',
+              value: `<t:${(joined - (joined % 1000)) / 1000}>`,
+              inline: true,
+            },
+            {
+              name: '☀️ Account Creation',
+              value: `<t:${~~(idToTimestamp(discord.id as string).getTime() / 1000)}>`,
+              inline: true,
+            },
+            {
+              name: 'Lanyard API URL',
+              value: `[\`api.lanyard.rest/v1/users/${discord.id}\`](https://api.lanyard.rest/v1/users/${discord.id})`,
+            },
+            {
+              name: 'K/V Keys',
+              value: `\`\`\`json\n${Object.keys(lanyard?.data?.kv || { none: true }).join(', ')}\n\`\`\``,
+            },
+          ],
+          thumbnail: {
+            url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}`,
+          },
+          color: parseInt(discord.banner_color || '#63723d', 16),
+        };
+      } catch (error: any) {
+        if ('code' in error) {
+          if (error.code == 'no_lanyard_user') {
+            return {
+              title: 'Lanyard Whois',
+              description: 'User is not in the Lanyard server\n\nJoin here [discord.gg/lanyard](https://discord.gg/lanyard)',
+              color: 0x726311,
+            };
+          }
+        }
+
+        return {
+          title: 'Lanyard Whois',
+          description: 'Failed to lookup Lanyard user, try again later',
+          color: 0x726311,
+        };
+      }
+    },
   },
   {
     command: 'kv',

@@ -28,9 +28,9 @@ export interface Embed {
 }
 
 export interface Author {
-  name: string;
-  url: string;
-  icon_url: string;
+  name?: string;
+  url?: string;
+  icon_url?: string;
 }
 
 export interface Field {
@@ -40,8 +40,8 @@ export interface Field {
 }
 
 export interface Footer {
-  icon_url: string;
-  text: string;
+  icon_url?: string;
+  text?: string;
 }
 
 export interface Image {
