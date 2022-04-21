@@ -22,7 +22,6 @@ export async function getDiscordUser(id: string): Promise<User | null> {
   const data = await fetch(`https://discord.com/api/v8/users/${id}`, {
     headers: { authorization: `Bot ${DISCORD_TOKEN}` },
   }).then((r) => r.json<User | { code: number }>());
-  console.log(data);
   if ('code' in data) return null;
 
   return data;

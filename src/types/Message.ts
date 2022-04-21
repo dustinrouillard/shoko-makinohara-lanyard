@@ -60,11 +60,16 @@ export interface MessageComponent {
   components: Component[];
 }
 
+export interface Emoji {
+  id?: string;
+  name?: string;
+}
+
 export interface Component {
   type: ComponentType;
   label: string;
   style: number;
   custom_id?: string;
   url?: string;
-  emoji?: string;
+  emoji?: Emoji;
 }

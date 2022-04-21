@@ -14,9 +14,10 @@ export interface Command {
   content?: string;
   ephemeral?: boolean;
   post_channels?: string[];
-  embed?: (body: DiscordInteraction, user: User) => Partial<Embed> | Promise<Partial<Embed>>;
-  components?: (body: DiscordInteraction, user: User) => Partial<Component[]> | Promise<Partial<Component[]>>;
-  function?: (body: DiscordInteraction, user: User, response: CraftedResponse) => Promise<void>;
+  prehandler?: (body: DiscordInteraction, user: User) => Record<string, any> | Promise<Record<string, any>>;
+  embed?: (context: Record<string, any>, body: DiscordInteraction, user: User) => Partial<Embed> | Promise<Partial<Embed>>;
+  components?: (context: Record<string, any>, body: DiscordInteraction, user: User) => Partial<Component[]> | Promise<Partial<Component[]>>;
+  function?: (context: Record<string, any>, body: DiscordInteraction, user: User, response: CraftedResponse) => Promise<void>;
 }
 
 export const Commands: Command[] = [
@@ -34,7 +35,7 @@ export const Commands: Command[] = [
   {
     command: 'user',
     description: 'Returns your Discord User ID',
-    embed: (body: DiscordInteraction, user: User) => ({
+    embed: (context: Record<string, any>, body: DiscordInteraction, user: User) => ({
       title: 'Discord User ID',
       description: `Your Discord User ID is \`${user.id}\`\n\nLanyard API URL\n[api.lanyard.rest/v1/users/${user.id}](https://api.lanyard.rest/v1/users/${user.id})`,
       color: 0x272783,
@@ -44,17 +45,48 @@ export const Commands: Command[] = [
     command: 'who',
     description: 'Returns your Lanyard/Discord user info',
     post_channels: ['911712979291086919', '927757958010503171'],
-    embed: async (body: DiscordInteraction, user: User) => {
+    prehandler: async (body: DiscordInteraction, user: User) => {
+      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+      const lanyard = await fetchLanyardUser(id);
+      const discord = await getDiscordUser(id);
+
+      if (!lanyard || !discord)
+        return {
+          title: 'Lanyard Whois',
+          description: 'User is not in the Lanyard server\n\nJoin here [discord.gg/lanyard](https://discord.gg/lanyard)',
+          color: 0x726311,
+        };
+
+      const member = await getLanyardMember(id);
+      const joined = new Date(member.joined_at).getTime();
+
+      return {
+        joined,
+        member,
+        lanyard,
+        discord,
+        id,
+      };
+    },
+    components: (context: Record<string, any>) => {
+      const { discord } = context;
+
+      return [
+        {
+          type: ComponentType.Button,
+          style: 5,
+          label: 'API',
+          emoji: {
+            id: '915314938631835709',
+          },
+          url: `https://api.lanyard.rest/v1/users/${discord.id}`,
+        },
+      ];
+    },
+    embed: async (context: Record<string, any>, body: DiscordInteraction, user: User) => {
+      const { joined, lanyard, discord } = context;
+
       try {
-        const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
-        const lanyard = await fetchLanyardUser(id);
-        const discord = await getDiscordUser(id);
-
-        if (!lanyard || !discord) throw { code: 'no_lanyard_user' };
-
-        const member = await getLanyardMember(id);
-        const joined = new Date(member.joined_at).getTime();
-
         return {
           title: 'Lanyard Whois',
           author: {
@@ -74,12 +106,16 @@ export const Commands: Command[] = [
               inline: true,
             },
             {
-              name: 'Lanyard API URL',
+              name: '<:tag:915314938631835709> Lanyard API URL',
               value: `[\`api.lanyard.rest/v1/users/${discord.id}\`](https://api.lanyard.rest/v1/users/${discord.id})`,
             },
             {
-              name: 'K/V Keys',
+              name: '🔑 K/V Keys',
               value: `\`\`\`json\n${Object.keys(lanyard?.data?.kv || {}).join(', ') || 'None'}\n\`\`\``,
+            },
+            {
+              name: '🗒️ Note (kv.note)',
+              value: `\`\`\`json\n${lanyard?.data?.kv.note || 'None'}\n\`\`\``,
             },
           ],
           thumbnail: {
@@ -88,16 +124,6 @@ export const Commands: Command[] = [
           color: parseInt(discord.banner_color || '#63723d', 16),
         };
       } catch (error: any) {
-        if ('code' in error) {
-          if (error.code == 'no_lanyard_user') {
-            return {
-              title: 'Lanyard Whois',
-              description: 'User is not in the Lanyard server\n\nJoin here [discord.gg/lanyard](https://discord.gg/lanyard)',
-              color: 0x726311,
-            };
-          }
-        }
-
         return {
           title: 'Lanyard Whois',
           description: 'Failed to lookup Lanyard user, try again later',
@@ -110,7 +136,7 @@ export const Commands: Command[] = [
     command: 'kv',
     post_channels: ['911712979291086919', '927757958010503171'],
     description: 'Returns users Lanyard K/V pairs',
-    embed: async (body: DiscordInteraction, user: User) => {
+    embed: async (context: Record<string, any>, body: DiscordInteraction, user: User) => {
       const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
       const lanyard = await fetchLanyardUser(id);
       return {
@@ -125,7 +151,7 @@ export const Commands: Command[] = [
   {
     command: 'kvapi',
     description: "Returns information about interacting with Lanyard's K/V with the API",
-    embed: (body: DiscordInteraction, user: User) => ({
+    embed: (context: Record<string, any>, body: DiscordInteraction, user: User) => ({
       title: 'Lanyard K/V API',
       description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
       color: 0xfeb321,
@@ -134,7 +160,7 @@ export const Commands: Command[] = [
   {
     command: 'metrics',
     description: 'Returns various metrics from Lanyard',
-    embed: async (body: DiscordInteraction) => {
+    embed: async (context: Record<string, any>, body: DiscordInteraction) => {
       try {
         const monitored_users = await getValue('lanyard_monitored_users');
         const connected_sessions = await getValue('lanyard_connected_sessions');
@@ -170,7 +196,7 @@ export const Commands: Command[] = [
   {
     command: 'socket',
     description: 'Returns information about using the Lanyard socket',
-    embed: (body: DiscordInteraction, user: User) => ({
+    embed: (context: Record<string, any>, body: DiscordInteraction, user: User) => ({
       title: 'Lanyard K/V API',
       description: `The socket is best way to implement Lanyard\n\n**Opcodes**\n*0*: \`Event\`\n*1*: \`Hello\`\n*2*: \`Initialize\`\n*3*: \`Heartbeat\`\n\n**Sending the heartbeat**\nAfter you connect to the socket you should listen for \`OP 1\` which will contain the \`d\` object that looks like this.\n\`\`\`json\n{\n  "op":1,\n  "d":{\n    "heartbeat_interval":30000\n  }\n}\n\`\`\`\nYou'll want to use the \`heartbeat_interval\` property and send \`OP 3\` on this interval like so. \`{"op":3}\`\n\nAfter we've established sending our heartbeat, you'll want to send \`OP 2\` initialize to subscribe to presence events for your user, a list of users, or every user lanyard monitors.\n\n*Just one*: \`{"op":2,"d":{"subscribe_to_id":"ID"}}\`\n*Multiple*: \`{"op":2,"d":{"subscribe_to_ids":["ID","ID"]}}\`\n*All*: \`{"op":2,"d":{"subscribe_to_all":true}}\`\n\nYou will receive an event on \`OP 0\` which has a property called \`t\` which has the following events\n- \`INIT_STATE\`\n- \`PRESENCE_UPDATE\`\n\nOnce you send the subscribe data you will get \`OP 0\`, \`INIT_STATE\` which conatins the initial presence data of the users you subscribed to in one of two formats.\n\n**If you subscribed to one user**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n**If you subscribed to multiple users or all**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    "ID":{\n      ...presence data\n    }\n  }\n}\n\`\`\`\n\nYou then will receive \`OP 0\`, \`PRESENCE_UPDATE\` when any user you're subscribed to has a presence update.\n\`\`\`json\n{\n  "op":0,\n  "t":"PRESENCE_UPDATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n\n[Example in javascript](https://gist.github.com/dustinrouillard/2b2a2f7f18be5690f0c487c8a16fa707).`,
       color: 0xabe221,
@@ -179,7 +205,7 @@ export const Commands: Command[] = [
   {
     command: 'react',
     description: 'Usage instructions for React',
-    embed: (body: DiscordInteraction, user: User) => ({
+    embed: (context: Record<string, any>, body: DiscordInteraction, user: User) => ({
       title: 'Usage with React',
       description: `Using Lanyard with a React site can be done in many different ways, but the easiest way would be to use the hook <@268798547439255572> made\n[use-lanyard](https://github.com/alii/use-lanyard)\n\n**Usage examples for the use-lanyard hook**\n\nUsing SWR (HTTP Polling):\n\`\`\`js\nimport { useLanyard } from 'use-lanyard';\n\nconst DISCORD_ID = '${user.id}';\n\nexport function Activity() {\n  const { data: activity } = useLanyard(DISCORD_ID);\n\n  return <>...</>;\n}\n\`\`\`\nUsing the socket **(Recommended)**\`\`\`js\nimport { useLanyardWs } from 'use-lanyard';\n\nconst DISCORD_ID = '${user.id}';\n\nexport function Activity() {\n  const activity = useLanyardWs(DISCORD_ID);\n\n  return <>...</>;\n}\n\`\`\`\nThis gives you the raw Lanyard API data as an object, meaning you can create a component for any of the data that Lanyard returns and it'll be always up to date with your presence data from discord.`,
       color: 0x61dbfb,
@@ -199,7 +225,7 @@ export const Commands: Command[] = [
   {
     command: 'spotify',
     description: 'Returns information about spotify data from Lanyard',
-    embed: async (body: DiscordInteraction, user: User) => {
+    embed: async (context: Record<string, any>, body: DiscordInteraction, user: User) => {
       const lanyard = await fetchLanyardUser(user.id);
       const currentTime = new Date().getTime();
 
@@ -219,7 +245,7 @@ export const Commands: Command[] = [
   {
     command: 'cards',
     description: 'Returns Lanyard visualizer/card contributions from the community',
-    embed: async (body: DiscordInteraction, user: User) => {
+    embed: async (context: Record<string, any>, body: DiscordInteraction, user: User) => {
       const lanyardProfileReadmeUsers: { count: number } = await fetch('https://lanyard.cnrad.dev/api/getUserCount').then((r) => r.json());
       return {
         title: 'Lanyard Cards and Visualizers',
@@ -314,17 +340,21 @@ export async function processCommand(name: string, body: DiscordInteraction, res
   const flags = post_channel || !body.channel_id ? null : ephemeral ? MessageFlags.Ephemeral : null;
 
   const user = (body.member?.user || body.user) as User;
-  const components = command.components ? [{ type: 1, components: await command.components(body, user) }] : undefined;
+
+  let context = {};
+  if (command.prehandler) context = await command.prehandler(body, user);
+
+  const components = command.components ? [{ type: 1, components: await command.components(context, body, user) }] : undefined;
 
   if (command.function) {
-    return await command.function(body, user, response);
+    return await command.function(context, body, user, response);
   } else if (command.embed) {
     return response.status(200).send({
       type: 4,
       data: {
         flags,
         content: command.content,
-        embeds: [await command.embed(body, user)],
+        embeds: [await command.embed(context, body, user)],
         components,
       },
     });
