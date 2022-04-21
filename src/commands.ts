@@ -79,7 +79,7 @@ export const Commands: Command[] = [
             },
             {
               name: 'K/V Keys',
-              value: `\`\`\`json\n${Object.keys(lanyard?.data?.kv || { none: true }).join(', ')}\n\`\`\``,
+              value: `\`\`\`json\n${Object.keys(lanyard?.data?.kv || {}).join(', ') || 'None'}\n\`\`\``,
             },
           ],
           thumbnail: {
