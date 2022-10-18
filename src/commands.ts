@@ -149,6 +149,40 @@ export const Commands: Command[] = [
     },
   },
   {
+    command: 'analytics',
+    post_channels: ['911712979291086919', '927757958010503171'],
+    description: 'Returns analytics about your Lanyard presence',
+    embed: async (context: Record<string, any>, body: DiscordInteraction, user: User) => {
+      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+      const analytics: { presence: number } = await fetch(`https://lanyard-tracking.dstn.to/${id}/analytics`).then((r) => r.json());
+
+      if (!('presence' in analytics))
+        return {
+          title: 'Lanyard User Analytics',
+          description: 'Analytics for user not found',
+          color: 0x283812,
+        };
+
+      const lanyard = await fetchLanyardUser(id);
+
+      return {
+        title: `Lanyard User Analytics`,
+        fields: [
+          {
+            name: 'Total Presence Updates',
+            value: analytics.presence.toLocaleString(),
+          },
+        ],
+        footer: { text: 'This data has only been tracking since April 21st, 2022' },
+        author: {
+          name: `${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
+          icon_url: `https://cdn.discordapp.com/avatars/${lanyard?.data?.discord_user.id}/${lanyard?.data?.discord_user.avatar}`,
+        },
+        color: 0xff9823,
+      };
+    },
+  },
+  {
     command: 'kvapi',
     description: "Returns information about interacting with Lanyard's K/V with the API",
     embed: (context: Record<string, any>, body: DiscordInteraction, user: User) => ({
