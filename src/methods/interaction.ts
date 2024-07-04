@@ -9,7 +9,7 @@ export async function Interaction(request: ParsedRequest<{ Body: DiscordInteract
     }
     case 2: {
       try {
-        return processCommand(request.body.data.name, request.body, response);
+        return processCommand(request.body.data.name, request.body, request, response);
       } catch (error: any) {
         return response.status(400).send(error.toString());
       }

@@ -1,4 +1,4 @@
-import { CraftedResponse } from './types/Routes';
+import { CraftedResponse, ParsedRequest } from './types/Routes';
 import { fetchLanyardUser } from './utils/lanyard';
 import { pullLanyardReadme } from './utils/github';
 import { Component, ComponentType, Embed, MessageFlags } from './types/Message';
@@ -15,7 +15,7 @@ export interface Command {
   ephemeral?: boolean;
   post_channels?: string[];
   prehandler?: (body: DiscordInteraction, user: User) => Record<string, any> | Promise<Record<string, any>>;
-  embed?: (context: Record<string, any>, body: DiscordInteraction, user: User) => Partial<Embed> | Promise<Partial<Embed>>;
+  embed?: (context: Record<string, any>, body: DiscordInteraction, user: User, request: ParsedRequest) => Partial<Embed> | Promise<Partial<Embed>>;
   components?: (context: Record<string, any>, body: DiscordInteraction, user: User) => Partial<Component[]> | Promise<Partial<Component[]>>;
   function?: (context: Record<string, any>, body: DiscordInteraction, user: User, response: CraftedResponse) => Promise<void>;
 }
@@ -141,9 +141,8 @@ export const Commands: Command[] = [
       const lanyard = await fetchLanyardUser(id);
       return {
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
-        description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
-          lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'
-        }\n\`\`\`\nTo access a key within a script, pull your Lanyard object [\`api.lanyard.rest/v1/users/${id}\`](https://api.lanyard.rest/v1/users/${id})\nand the json path is\`.data.kv.KEY_NAME\`\nwhen using the socket it will be \`.d.kv.KEY_NAME\`\nThe \`.\` referencing the root of your JSON response\n\nYou can set K/V items by reading the help with \`.kv\``,
+        description: `Current Lanyard K/V Items\n\n\`\`\`json\n${lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'
+          }\n\`\`\`\nTo access a key within a script, pull your Lanyard object [\`api.lanyard.rest/v1/users/${id}\`](https://api.lanyard.rest/v1/users/${id})\nand the json path is\`.data.kv.KEY_NAME\`\nwhen using the socket it will be \`.d.kv.KEY_NAME\`\nThe \`.\` referencing the root of your JSON response\n\nYou can set K/V items by reading the help with \`.kv\``,
         color: 0xff9823,
       };
     },
@@ -230,9 +229,8 @@ export const Commands: Command[] = [
     description: 'Learn how to handle various assets',
     embed: async (_, user) => ({
       title: 'Discord Assets',
-      description: `Discord returns various things for their assets, however they're easy to convert to the cdn url so you can use them.\nYou can also read the discord developer docs page for [image formatting](https://discord.com/developers/docs/reference#image-formatting).\n\n**Avatars**\nThe API returns the hash of the avatar, which you have to combine with the ID to get the image URL\n\`https://cdn.discordapp.com/avatars/<USER_ID>/<HASH>\`\n\n**Activity Icons**\nActivity icons vary a little bit, for most of them they don't have a hash, and you can use the following structure\n\`https://cdn.discordapp.com/app-icons/<APP_ID>/<ASSET_ID>\`\n\nFor some activities that don't have an assets object (These are normally manually added games or games without rich presences) they don't have an easy way without a third party service to get their asset hash, however <@156114103033790464> has made a worker for this, and you can learn about it by running \`/banners\` or [here](https://dcdn.dstn.to/gist)\n\nFor all of these you can include a file extension \`.png .webp .gif .jpeg\` and or a \`size\` query param\n*Example: \`https://cdn.discordapp.com/avatars/${
-        user.id
-      }/${(await fetchLanyardUser(user.id))?.data?.discord_user.avatar}.png?size=512\`*`,
+      description: `Discord returns various things for their assets, however they're easy to convert to the cdn url so you can use them.\nYou can also read the discord developer docs page for [image formatting](https://discord.com/developers/docs/reference#image-formatting).\n\n**Avatars**\nThe API returns the hash of the avatar, which you have to combine with the ID to get the image URL\n\`https://cdn.discordapp.com/avatars/<USER_ID>/<HASH>\`\n\n**Activity Icons**\nActivity icons vary a little bit, for some apps you'll have asset IDs, and with those you can use the following structure\n\`https://cdn.discordapp.com/app-assets/<APP_ID>/<ASSET_ID>\`\n\nThen there is some application assets that use the \`mp:external\` syntax, which you have two options to handle those\n> 1: Use the replace syntax in your language of choice to add on the discord media proxy:\n> \`https://media.discordapp.net/\${activity.assets.large_image.replace("mp:", "")}\` *(Same syntax for small_image if present)*\n> 2: Ignore the media proxy and use the direct url using a regex replace\n> \`activity.assets.large_image.replace(/mp:external\\/([^\\/]*)\\/(http[s])/g, '$2:/')\` *(Would suggest option 1 due to the protections it provides the end user)*\n\nFor the activities that don't have an assets object (These are normally manually added games or games without rich presences) they don't have an easy way without a third party service to get their asset hash, however <@156114103033790464> has made a worker for this, and you can learn about it by running \`/banners\` or [here](https://dcdn.dstn.to/gist)\n\nFor all of these you can include a file extension \`.png .webp .gif .jpeg\` and or a \`size\` query param\n*Example: \`https://cdn.discordapp.com/avatars/${user.id
+        }/${(await fetchLanyardUser(user.id))?.data?.discord_user.avatar}.png?size=512\`*`,
       color: 0x647322,
     }),
   },
@@ -245,13 +243,12 @@ export const Commands: Command[] = [
 
       return {
         title: 'Lanyard K/V API',
-        description: `**Calculating current position and song length using the data timestamps provided by your Lanyard data**\n\nAll you have to do is a bit of math\n\`spotify.timestamps.end - spotify.timestamps.start\` = song length\n\`currentTimeInMs - spotify.timestamps.start\` = current position\n\nThese values are in milliseconds so you'll need to convert them using more math, example for calculating this in javascript seen [here](https://gist.github.com/dustinrouillard/8140fd47c5900d4421637b098b6d92c0)${
-          lanyard?.data?.spotify
-            ? `\n\n**Your current listening data**\n\`${lanyard.data.spotify.song} by ${lanyard.data.spotify.artist}\`\n\`Time: ${msToMinSeconds(
-                currentTime - lanyard.data.spotify.timestamps.start,
-              )} - ${msToMinSeconds((lanyard.data.spotify.timestamps.end || 0) - lanyard.data.spotify.timestamps.start)}\``
-            : '\n\n*Start listening to music to see the timestamps here*'
-        }`,
+        description: `**Calculating current position and song length using the data timestamps provided by your Lanyard data**\n\nAll you have to do is a bit of math\n\`spotify.timestamps.end - spotify.timestamps.start\` = song length\n\`currentTimeInMs - spotify.timestamps.start\` = current position\n\nThese values are in milliseconds so you'll need to convert them using more math, example for calculating this in javascript seen [here](https://gist.github.com/dustinrouillard/8140fd47c5900d4421637b098b6d92c0)${lanyard?.data?.spotify
+          ? `\n\n**Your current listening data**\n\`${lanyard.data.spotify.song} by ${lanyard.data.spotify.artist}\`\n\`Time: ${msToMinSeconds(
+            currentTime - lanyard.data.spotify.timestamps.start,
+          )} - ${msToMinSeconds((lanyard.data.spotify.timestamps.end || 0) - lanyard.data.spotify.timestamps.start)}\``
+          : '\n\n*Start listening to music to see the timestamps here*'
+          }`,
         color: 0xb21332,
       };
     },
@@ -263,11 +260,9 @@ export const Commands: Command[] = [
       const lanyardProfileReadmeUsers: { count: number } = await fetch('https://lanyard.cnrad.dev/api/getUserCount').then((r) => r.json());
       return {
         title: 'Lanyard Cards and Visualizers',
-        description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [View Card](https://lanyard.cnrad.dev/api/${
-          user.id
-        }) \`Used by : ${lanyardProfileReadmeUsers.count.toLocaleString()} users\`\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [View Card](https://lanyard-visualizer.netlify.app/user/${
-          user.id
-        })\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
+        description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [View Card](https://lanyard.cnrad.dev/api/${user.id
+          }) \`Used by : ${lanyardProfileReadmeUsers.count.toLocaleString()} users\`\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [View Card](https://lanyard-visualizer.netlify.app/user/${user.id
+          })\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
         color: 0x893012,
       };
     },
@@ -325,10 +320,10 @@ export const Commands: Command[] = [
   {
     command: 'stats',
     description: 'Shoko Makinohara Statistics',
-    embed: async () => ({
+    embed: async (_context, _body, _user, request: ParsedRequest) => ({
       title: 'Shoko Makinohara Stats',
-      footer: { text: `Working in ${(await getGuildStats()).toLocaleString()} guilds` },
-      description: `Current command usage statistics\n\n${(await getAllStats()).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
+      footer: { text: `Working in ${(await getGuildStats(request.env)).toLocaleString()} guilds` },
+      description: `Current command usage statistics\n\n${(await getAllStats(request.env)).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
       color: 0x849203,
     }),
   },
@@ -343,11 +338,11 @@ export const Commands: Command[] = [
   },
 ];
 
-export async function processCommand(name: string, body: DiscordInteraction, response: CraftedResponse) {
+export async function processCommand(name: string, body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
   const command = Commands.find((cmd) => (typeof cmd.command == 'object' ? cmd.command.includes(name) : cmd.command == name));
   if (!command) return response.status(400).send('invalid request');
 
-  await trackCommand(name);
+  await trackCommand(name, request.env);
 
   const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
   const post_channel = command.post_channels && command.post_channels.includes(body.channel_id);
@@ -368,7 +363,7 @@ export async function processCommand(name: string, body: DiscordInteraction, res
       data: {
         flags,
         content: command.content,
-        embeds: [await command.embed(context, body, user)],
+        embeds: [await command.embed(context, body, user, request)],
         components,
       },
     });

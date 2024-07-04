@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import { sign } from 'tweetnacl';
 import { CraftedResponse, ParsedRequest } from '../types/Routes';
 
@@ -9,7 +11,7 @@ export async function Verification(request: ParsedRequest, response: CraftedResp
 
   const body = JSON.stringify(request.body);
 
-  const isVerified = sign.detached.verify(Buffer.from(timestamp + body), Buffer.from(signature, 'hex'), Buffer.from(DISCORD_PUBLIC_KEY, 'hex'));
+  const isVerified = sign.detached.verify(Buffer.from(timestamp + body), Buffer.from(signature, 'hex'), Buffer.from(request.env.DISCORD_PUBLIC_KEY, 'hex'));
   if (!isVerified) return response.status(401).send('invalid request signature');
 
   return isVerified;

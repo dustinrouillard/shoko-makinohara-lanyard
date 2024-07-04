@@ -13,7 +13,7 @@ export interface ResponseGeneric {
   Body?: unknown;
 }
 
-export interface RouteGeneric extends RequestGeneric, ResponseGeneric {}
+export interface RouteGeneric extends RequestGeneric, ResponseGeneric { }
 
 export interface ParsedRequest<RG extends RouteGeneric = RouteGeneric> {
   buffer: ArrayBuffer;
@@ -23,8 +23,8 @@ export interface ParsedRequest<RG extends RouteGeneric = RouteGeneric> {
   headers: RG['Headers'] & { [key: string]: string };
   method: Method;
   url: URL;
+  env: Env;
   cloudflare?: IncomingRequestCfProperties;
-  _event: FetchEvent;
 }
 
 export interface CraftedResponse {
@@ -45,4 +45,17 @@ export interface RouteDefinition {
   handler: (request: ParsedRequest<any>, response: CraftedResponse) => void | Promise<void>;
   args?: any[];
   middlewares?: Middleware[];
+}
+
+export interface Env {
+  DISCORD_PUBLIC_KEY: string;
+  INTERNAL_TOKEN: string;
+  DISCORD_TOKEN: string;
+  GUILD_ID: string;
+
+  PROMETHEUS_ENDPOINT: string;
+  PROMETHEUS_USERNAME: string;
+  PROMETHEUS_PASSWORD: string;
+
+  Storage: KVNamespace;
 }

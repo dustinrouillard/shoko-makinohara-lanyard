@@ -1,17 +1,17 @@
 import { routes } from './routes';
 
-import { CraftedResponse, Method, ParsedRequest } from './types/Routes';
+import { CraftedResponse, Env, Method, ParsedRequest } from './types/Routes';
 import { NotFound } from './methods/notfound';
 
-addEventListener('fetch', (event) => {
-  event.respondWith(
-    new Promise(async (resolve) => {
-      const url = new URL(event.request.url);
+export default {
+  async fetch(_request: Request, env: Env): Promise<Response> {
+    return new Promise(async (resolve) => {
+      const url = new URL(_request.url);
 
-      const request = event.request.clone();
+      const request = _request.clone();
       const headers = Object.fromEntries([...request.headers]);
       const method = request.method as Method;
-      const buffer = await event.request.clone().arrayBuffer();
+      const buffer = await request.clone().arrayBuffer();
 
       let body;
       if (!['GET', 'OPTIONS', 'HEAD'].includes(method)) {
@@ -20,7 +20,7 @@ addEventListener('fetch', (event) => {
       }
 
       const route = routes.find(
-        (route) => route.route.match(url.pathname.endsWith('/') && url.pathname.length > 1 ? url.pathname.slice(0, -1) : url.pathname) && route.method == event.request.method,
+        (route) => route.route.match(url.pathname.endsWith('/') && url.pathname.length > 1 ? url.pathname.slice(0, -1) : url.pathname) && route.method == _request.method,
       );
       const params = route?.route.match(url.pathname.endsWith('/') && url.pathname.length > 1 ? url.pathname.slice(0, -1) : url.pathname);
       const query = Object.fromEntries([...url.searchParams]);
@@ -33,8 +33,8 @@ addEventListener('fetch', (event) => {
         params,
         query,
         url,
-        cloudflare: request.cf,
-        _event: event,
+        env,
+        cloudflare: request.cf
       };
 
       const res: CraftedResponse = {
@@ -50,6 +50,7 @@ addEventListener('fetch', (event) => {
         send: (body?: any) => {
           if (typeof body == 'object' && !res.headers['content-type']) res.headers['content-type'] = 'application/json';
           const response = new Response(typeof body == 'object' ? JSON.stringify(body) : body, { headers: res.headers, status: res.statusCode });
+          console.log('sending', response);
           resolve(response);
         },
         proxy: async (host: string) => {
@@ -66,13 +67,23 @@ addEventListener('fetch', (event) => {
         },
       };
 
-      if (route?.middlewares)
-        for await (const middleware of route.middlewares) {
-          let mw = await middleware(req, res);
-          if (!mw) return mw;
-        }
+      try {
+        if (route?.middlewares)
+          for await (const middleware of route.middlewares) {
+            let mw = await middleware(req, res);
+            if (!mw) return mw;
+          }
+      } catch (error) {
+        console.error('mw error', error);
+        resolve(new Response(JSON.stringify({ code: 'internal_error' }), { status: 403, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } }));
+      }
 
-      route ? route.handler(req, res) : NotFound(req, res);
-    }),
-  );
-});
+      try {
+        route ? route.handler(req, res) : NotFound(req, res);
+      } catch (error) {
+        console.error('error', error);
+        resolve(new Response(JSON.stringify({ code: 'internal_error' }), { status: 500, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } }));
+      }
+    });
+  },
+};
