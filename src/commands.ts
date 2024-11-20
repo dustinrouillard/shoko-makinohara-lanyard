@@ -266,7 +266,16 @@ export const Commands: Command[] = [
     command: 'cards',
     description: 'Returns Lanyard visualizer/card contributions from the community',
     embed: async (context: Context, body: DiscordInteraction, user: User) => {
-      const lanyardProfileReadmeUsers: { count: number } = await fetch('https://lanyard.cnrad.dev/api/getUserCount').then((r) => r.json());
+      const lanyardProfileReadmeUsers: { count: number } = await fetch('https://lanyard.cnrad.dev', {
+        method: 'POST',
+        body: '["getUserCount"]',
+        headers: { 'Next-Action': '00ee1f22c1ad7bfba4974e05d7db2a21058722b95f', 'Content-Type': 'text/plain' },
+      })
+        .then(async (r) => {
+          const t = await r.text();
+          return { count: Number(t.split('\n')[1]?.match(/1:(.*)/)?.[1] ?? 0) };
+        })
+        .catch(() => ({ count: 0 }));
       return {
         title: 'Lanyard Cards and Visualizers',
         description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [View Card](https://lanyard.cnrad.dev/api/${
