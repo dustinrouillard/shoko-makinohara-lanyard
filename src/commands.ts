@@ -155,20 +155,6 @@ export const Commands: Command[] = [
     },
   },
   {
-    command: 'analytics',
-    post_channels: ['911712979291086919', '927757958010503171'],
-    description: 'Returns analytics about your Lanyard presence',
-    embed: async (context: Context, body: DiscordInteraction, user: User) => {
-      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
-
-      return {
-        title: `Lanyard User Analytics`,
-        description: "Command disabled, moving this to the same platform as Lanyard, but until then there is no stats, and I'm not tracking them, meaning they will reset.",
-        color: 0xff9823,
-      };
-    },
-  },
-  {
     command: 'kvapi',
     description: "Returns information about interacting with Lanyard's K/V with the API",
     embed: (context: Context, body: DiscordInteraction, user: User) => ({
