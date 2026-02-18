@@ -24,6 +24,7 @@ export interface CommandOptions {
   name: string;
   type: number;
   value: string;
+  options?: CommandOptions[];
 }
 
 export interface Member {

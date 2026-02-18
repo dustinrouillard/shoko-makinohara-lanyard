@@ -6,7 +6,9 @@ import { DiscordInteraction, User } from './types/Interaction';
 import { getAllStats, getGuildStats, trackCommand } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
-import { getDiscordUser, getLanyardMember, idToTimestamp } from './utils/discord';
+import { bulkDeleteMessages, getChannelMessages, getDiscordUser, getLanyardMember, idToTimestamp } from './utils/discord';
+import { chunk } from './utils/array';
+import { Message } from './types/Discord';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -33,6 +35,73 @@ export const Commands: Command[] = [
       ).join('\n')}`,
       color: 0xef2123,
     }),
+  },
+  {
+    command: 'delete',
+    description: 'Bulk deletes messages in the current channel',
+    function: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const subcommand = body.data.options?.[0]?.name;
+      console.log(body.data.options);
+      const commandOptions = body.data.options?.[0]?.options ?? [];
+
+      let deleted = 0;
+      switch (subcommand) {
+        case 'last': {
+          const count = commandOptions.find((option) => option.name === 'count')?.value;
+
+          const messages = await getChannelMessages(context, body.channel_id, { limit: Number(count) });
+          await bulkDeleteMessages(
+            context,
+            body.channel_id,
+            messages.map((message) => message.id),
+          ).catch((error: string) => {
+            return response.status(200).send({
+              type: 4,
+              data: {
+                flags: MessageFlags.Ephemeral,
+                content: error,
+              },
+            });
+          });
+          deleted = messages.length;
+        }
+        case 'after': {
+          const after = commandOptions.find((option) => option.name === 'message')?.value;
+
+          const messages = await getChannelMessages(context, body.channel_id, { after, limit: 100 });
+          const chunks = chunk<Message>(messages, 100);
+          const promises = chunks.map((chunk, index) =>
+            bulkDeleteMessages(
+              context,
+              body.channel_id,
+              chunk.map((message) => message.id),
+            ).catch((error: string) => {
+              console.log('Failed to delete messages, chunk', index, error);
+              return response.status(200).send({
+                type: 4,
+                data: {
+                  flags: MessageFlags.Ephemeral,
+                  content: error,
+                },
+              });
+            }),
+          );
+          await Promise.all(promises);
+          deleted = messages.length;
+        }
+        default: {
+          break;
+        }
+      }
+
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.Ephemeral,
+          content: `Done ✅ \`Removed ${deleted} messages\``,
+        },
+      });
+    },
   },
   {
     command: 'user',
@@ -155,15 +224,6 @@ export const Commands: Command[] = [
     },
   },
   {
-    command: 'kvapi',
-    description: "Returns information about interacting with Lanyard's K/V with the API",
-    embed: (context: Context, body: DiscordInteraction, user: User) => ({
-      title: 'Lanyard K/V API',
-      description: `Lanyard has the ability to keep track of K/V pairs on your Lanyard object that is returned from the API, and will also send updates to them over the socket just like your discord presence data.\n\nFirst you'll need an API key which you can get by going to DM's with <@819287687121993768> and sending \`.apikey\`\n\nThen you can use the following route structure to manipulate and set K/V pairs\n\nAdding/changing a key: \`PUT /v1/users/${user.id}/kv/:key\`\n[*The body will be used as the value*](https://dustin.pics/d934048c87b6eb73.png)\n\nDeleing a key: \`DELETE /v1/users/${user.id}/kv/:key\`\n\nBoth of these routes will require an \`Authorization\` header containing your api key which you got eariler.`,
-      color: 0xfeb321,
-    }),
-  },
-  {
     command: 'metrics',
     description: 'Returns various metrics from Lanyard',
     embed: async (context: Context, body: DiscordInteraction) => {
@@ -200,10 +260,19 @@ export const Commands: Command[] = [
     },
   },
   {
+    command: 'kvapi',
+    description: 'Lanyard K/V Store and API',
+    embed: (context: Context, body: DiscordInteraction, user: User) => ({
+      title: 'Lanyard K/V Store and API',
+      description: `Lanyard KV is a realtime key/value store that lives alongside every Lanyard user object, so you can stash realtime metadata like a location, latest blog post link, social handles, weekly coding hours, weather conditions, or any other datapoints you’d rather update via simple scripts instead of running a whole backend.\n\n**Bot usage**\nTalk to @Lanyard (<@819287687121993768>) via DM or in <#911712979291086919> for \`.set\`, \`.get\`, \`.del\`, and \`.kv\` (keep \`.apikey\` to DMs only):\n\`.set <key> <value>\` – store/update a key\n\`.get <key>\` – read a key\n\`.del <key>\` – delete a key\n\`.kv\` – list everything stored\n\`.apikey\` – generate an HTTP API key *(DM only)*\n\n**HTTP API**\n1. Run \`.apikey\` and set the returned key in the \`Authorization\` header.\n2. Set/update: \`PUT /v1/users/:user_id/kv/:key\` (the raw request body becomes the value).\n3. Delete: \`DELETE /v1/users/:user_id/kv/:key\`.\n\nWhenever a key is written or removed, Lanyard emits a \`PRESENCE_UPDATE\` over the realtime socket, so subscribed socket clients immediately receive the refreshed \`.d.kv\` data, while REST callers will see the new \`.data.kv\` the next time they fetch.`,
+      color: 0xff977d,
+    }),
+  },
+  {
     command: 'socket',
     description: 'Returns information about using the Lanyard socket',
     embed: (context: Context, body: DiscordInteraction, user: User) => ({
-      title: 'Lanyard K/V API',
+      title: 'Lanyard over Websocket',
       description: `The socket is best way to implement Lanyard\n\n**Opcodes**\n*0*: \`Event\`\n*1*: \`Hello\`\n*2*: \`Initialize\`\n*3*: \`Heartbeat\`\n\n**Sending the heartbeat**\nAfter you connect to the socket you should listen for \`OP 1\` which will contain the \`d\` object that looks like this.\n\`\`\`json\n{\n  "op":1,\n  "d":{\n    "heartbeat_interval":30000\n  }\n}\n\`\`\`\nYou'll want to use the \`heartbeat_interval\` property and send \`OP 3\` on this interval like so. \`{"op":3}\`\n\nAfter we've established sending our heartbeat, you'll want to send \`OP 2\` initialize to subscribe to presence events for your user, a list of users, or every user lanyard monitors.\n\n*Just one*: \`{"op":2,"d":{"subscribe_to_id":"ID"}}\`\n*Multiple*: \`{"op":2,"d":{"subscribe_to_ids":["ID","ID"]}}\`\n*All*: \`{"op":2,"d":{"subscribe_to_all":true}}\`\n\nYou will receive an event on \`OP 0\` which has a property called \`t\` which has the following events\n- \`INIT_STATE\`\n- \`PRESENCE_UPDATE\`\n\nOnce you send the subscribe data you will get \`OP 0\`, \`INIT_STATE\` which conatins the initial presence data of the users you subscribed to in one of two formats.\n\n**If you subscribed to one user**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n**If you subscribed to multiple users or all**:\n\`\`\`json\n{\n  "op":0,\n  "t":"INIT_STATE",\n  "d":{\n    "ID":{\n      ...presence data\n    }\n  }\n}\n\`\`\`\n\nYou then will receive \`OP 0\`, \`PRESENCE_UPDATE\` when any user you're subscribed to has a presence update.\n\`\`\`json\n{\n  "op":0,\n  "t":"PRESENCE_UPDATE",\n  "d":{\n    ...presence data\n  }\n}\n\`\`\`\n\n[Example in javascript](https://gist.github.com/dustinrouillard/2b2a2f7f18be5690f0c487c8a16fa707).`,
       color: 0xabe221,
     }),
@@ -281,7 +350,7 @@ export const Commands: Command[] = [
       description: `The Lanyard community has worked on some pretty cool projects that allows you to extend the functionality of Lanyard. [PR to add a project](https://github.com/Phineas/lanyard)!\n\n${(
         await pullLanyardReadme()
       ).communityProjects
-        .map((item) => `${item.link}\n${item.description}`)
+        .map((item: { link: string; description: string }) => `${item.link}\n${item.description}`)
         .join('\n\n')}`,
       color: 0x392812,
     }),

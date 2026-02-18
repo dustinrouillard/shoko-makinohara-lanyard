@@ -7,3 +7,8 @@ export interface User {
   accent_color: string;
   banner_color: string;
 }
+
+export interface Message {
+  id: string;
+  content: string;
+}

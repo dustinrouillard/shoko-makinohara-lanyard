@@ -1,6 +1,6 @@
 import { processCommand } from '../commands';
-import { DiscordInteraction } from '../types/Interaction';
-import { CraftedResponse, ParsedRequest } from '../types/Routes';
+import type { DiscordInteraction } from '../types/Interaction';
+import type { CraftedResponse, ParsedRequest } from '../types/Routes';
 
 export async function Interaction(request: ParsedRequest<{ Body: DiscordInteraction }>, response: CraftedResponse) {
   switch (request.body.type) {
