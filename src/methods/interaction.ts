@@ -1,6 +1,72 @@
-import { processCommand } from '../commands';
-import type { DiscordInteraction } from '../types/Interaction';
+import { Command, Commands } from '../commands';
+import { Context, Interaction, Interactions } from '../interactions';
+import type { DiscordInteraction, User } from '../types/Interaction';
+import { Embed, MessageFlags } from '../types/Message';
 import type { CraftedResponse, ParsedRequest } from '../types/Routes';
+import { trackCommand } from '../utils/stats';
+
+export async function processCommand(name: string, body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
+  let command: Command | Interaction | undefined;
+  if (body.data.type == 1) command = Commands.find((cmd) => (typeof cmd.command == 'object' ? cmd.command.includes(name) : cmd.command == name));
+  else command = Interactions.find((cmd) => cmd.name == name);
+
+  if (!command) return response.status(400).send('invalid request');
+
+  await trackCommand(name, request.env);
+
+  const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
+  const post_channel = command.post_channels && command.post_channels.includes(body.channel_id);
+  const flags = post_channel || !body.channel_id ? null : ephemeral ? MessageFlags.Ephemeral : null;
+
+  const user = (body.member?.user || body.user) as User;
+
+  let context: Context = { env: request.env };
+  if (command.prehandler) context = await command.prehandler(context, body, user);
+
+  if ('error' in context) {
+    const error = context.error as Partial<Embed>;
+    return response.status(200).send({
+      type: 4,
+      data: {
+        flags,
+        content: command.content,
+        embeds: [error],
+      },
+    });
+  }
+
+  const components = command.components ? [{ type: 1, components: await command.components(context, body, user) }] : undefined;
+
+  try {
+    if (command.function) {
+      return await command.function(context, body, user, response);
+    } else if (command.embed) {
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags,
+          content: command.content,
+          embeds: [await command.embed(context, body, user, request)],
+          components,
+        },
+      });
+    } else if (command.content) {
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags,
+          content: command.content,
+          components,
+        },
+      });
+    } else {
+      return response.status(400).send('invalid request');
+    }
+  } catch (error) {
+    console.error(error);
+    return response.status(400).send('invalid request');
+  }
+}
 
 export async function Interaction(request: ParsedRequest<{ Body: DiscordInteraction }>, response: CraftedResponse) {
   switch (request.body.type) {

@@ -17,6 +17,7 @@ export interface Data {
   id: string;
   name: string;
   type: number;
+  target_id?: string;
   options?: CommandOptions[];
 }
 
