@@ -13,7 +13,7 @@ export interface ResponseGeneric {
   Body?: unknown;
 }
 
-export interface RouteGeneric extends RequestGeneric, ResponseGeneric { }
+export interface RouteGeneric extends RequestGeneric, ResponseGeneric {}
 
 export interface ParsedRequest<RG extends RouteGeneric = RouteGeneric> {
   buffer: ArrayBuffer;
@@ -52,6 +52,7 @@ export interface Env {
   INTERNAL_TOKEN: string;
   DISCORD_TOKEN: string;
   GUILD_ID: string;
+  MUTED_ROLE_ID: string;
 
   PROMETHEUS_ENDPOINT: string;
   PROMETHEUS_USERNAME: string;

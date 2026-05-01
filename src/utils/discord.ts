@@ -75,3 +75,34 @@ export async function bulkDeleteMessages(context: Record<string, any> & { env: E
 
   return req;
 }
+
+export async function addRoleToUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string) {
+  const req = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/members/${user_id}/roles/${role_id}`, {
+    method: 'PUT',
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
+  });
+
+  if (req.status != 204) return null;
+
+  return;
+}
+
+export async function removeRoleFromUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string) {
+  const req = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/members/${user_id}/roles/${role_id}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
+  });
+
+  if (req.status != 204) return null;
+
+  return;
+}
+
+export async function getGuildMember(context: Record<string, any> & { env: Env }, user_id: string) {
+  const data = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/${user_id}`, {
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
+  }).then((r) => r.json() as unknown as Member | { code: number });
+  if ('code' in data) return null;
+
+  return data;
+}

@@ -6,7 +6,7 @@ import { DiscordInteraction, User } from './types/Interaction';
 import { getAllStats, getGuildStats } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
-import { bulkDeleteMessages, getChannelMessages, getDiscordUser, getLanyardMember, idToTimestamp } from './utils/discord';
+import { addRoleToUser, bulkDeleteMessages, getChannelMessages, getDiscordUser, getGuildMember, getLanyardMember, idToTimestamp, removeRoleFromUser } from './utils/discord';
 import { chunk } from './utils/array';
 import { Message } from './types/Discord';
 
@@ -37,13 +37,85 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'mute',
+    description: 'Assigns the Muted role to the specified user',
+    function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+
+      const member = await getGuildMember(ctx, id);
+      if (!member)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user was not found in the guild',
+          },
+        });
+
+      if (member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user is already muted',
+          },
+        });
+
+      await addRoleToUser(ctx, user.id, ctx.env.MUTED_ROLE_ID);
+
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.Ephemeral,
+          content: `✅ Successfully muted <@${user.id}>`,
+        },
+      });
+    },
+  },
+  {
+    command: 'unmute',
+    description: 'Removes the Muted role from the specified user',
+    function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+
+      const member = await getGuildMember(ctx, id);
+      if (!member)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user was not found in the guild',
+          },
+        });
+
+      if (member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user is not currently muted',
+          },
+        });
+
+      await removeRoleFromUser(ctx, user.id, ctx.env.MUTED_ROLE_ID);
+
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.Ephemeral,
+          content: `✅ Successfully unmuted <@${user.id}>`,
+        },
+      });
+    },
+  },
+  {
     command: 'delete',
     description: 'Bulk deletes messages in the current channel',
     function: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const subcommand = body.data.options?.[0]?.name;
       const commandOptions = body.data.options?.[0]?.options ?? [];
 
-      let deleted = 0;
+      let deleted = [];
       switch (subcommand) {
         case 'last': {
           const count = commandOptions.find((option) => option.name === 'count')?.value;
@@ -62,7 +134,8 @@ export const Commands: Command[] = [
               },
             });
           });
-          deleted = messages.length;
+          deleted.push(...messages);
+          break;
         }
         case 'after': {
           const after = commandOptions.find((option) => option.name === 'message')?.value;
@@ -86,18 +159,23 @@ export const Commands: Command[] = [
             }),
           );
           await Promise.all(promises);
-          deleted = messages.length;
+          deleted.push(...messages);
+          break;
         }
         default: {
           break;
         }
       }
 
+      // Send off the messages to API for further processing
+      // Good ideas here to process why messages were possibly deleted (with ai?)
+      // and then use that data to send in a log channel.
+
       return response.status(200).send({
         type: 4,
         data: {
           flags: MessageFlags.Ephemeral,
-          content: `Done ✅ \`Removed ${deleted} messages\``,
+          content: `Done ✅ \`Removed ${deleted.length.toLocaleString()} messages\``,
         },
       });
     },

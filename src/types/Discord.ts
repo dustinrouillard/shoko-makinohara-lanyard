@@ -12,3 +12,8 @@ export interface Message {
   id: string;
   content: string;
 }
+
+export interface Member {
+  id: string;
+  roles: string[];
+}
