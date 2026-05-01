@@ -99,7 +99,7 @@ export async function removeRoleFromUser(context: Record<string, any> & { env: E
 }
 
 export async function getGuildMember(context: Record<string, any> & { env: Env }, user_id: string) {
-  const data = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/${user_id}`, {
+  const data = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/members/${user_id}`, {
     headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
   }).then((r) => r.json() as unknown as Member | { code: number });
   if ('code' in data) return null;
