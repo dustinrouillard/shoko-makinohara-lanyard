@@ -88,7 +88,7 @@ export const Commands: Command[] = [
           },
         });
 
-      if (member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
+      if (!member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
         return response.status(200).send({
           type: 4,
           data: {
