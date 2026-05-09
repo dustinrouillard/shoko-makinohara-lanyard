@@ -37,12 +37,99 @@ export const Commands: Command[] = [
     }),
   },
   {
+    command: 'op',
+    description: 'Ops the specified user, only available to Bunny Girl',
+    function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      if (!body.member?.roles.includes(ctx.env.BG_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: You do not have permissions to run this command',
+          },
+        });
+
+      const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const member = await getGuildMember(ctx, id as string);
+      if (!member)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user was not found in the guild',
+          },
+        });
+
+      if (member.roles.find((role) => role == ctx.env.OP_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user is already an Op',
+          },
+        });
+
+      await addRoleToUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.Ephemeral,
+          content: `✅ <@${member.user.id}> is now Op`,
+        },
+      });
+    },
+  },
+  {
+    command: 'deop',
+    description: 'Deops the specified user',
+    function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      if (!body.member?.roles.includes(ctx.env.BG_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: You do not have permissions to run this command',
+          },
+        });
+
+      const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const member = await getGuildMember(ctx, id as string);
+      if (!member)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user was not found in the guild',
+          },
+        });
+
+      if (!member.roles.find((role) => role == ctx.env.OP_ROLE_ID))
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: 'That user is not currently an Op',
+          },
+        });
+
+      await removeRoleFromUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.Ephemeral,
+          content: `✅ <@${member.user.id}> is no longer an Op`,
+        },
+      });
+    },
+  },
+  {
     command: 'mute',
     description: 'Assigns the Muted role to the specified user',
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
-      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
-
-      const member = await getGuildMember(ctx, id);
+      const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const member = await getGuildMember(ctx, id as string);
       if (!member)
         return response.status(200).send({
           type: 4,
@@ -61,13 +148,13 @@ export const Commands: Command[] = [
           },
         });
 
-      await addRoleToUser(ctx, user.id, ctx.env.MUTED_ROLE_ID);
+      await addRoleToUser(ctx, member.user.id, ctx.env.MUTED_ROLE_ID);
 
       return response.status(200).send({
         type: 4,
         data: {
           flags: MessageFlags.Ephemeral,
-          content: `✅ Successfully muted <@${user.id}>`,
+          content: `✅ Successfully muted <@${member.user.id}>`,
         },
       });
     },
@@ -76,9 +163,8 @@ export const Commands: Command[] = [
     command: 'unmute',
     description: 'Removes the Muted role from the specified user',
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
-      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
-
-      const member = await getGuildMember(ctx, id);
+      const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const member = await getGuildMember(ctx, id as string);
       if (!member)
         return response.status(200).send({
           type: 4,
@@ -97,13 +183,13 @@ export const Commands: Command[] = [
           },
         });
 
-      await removeRoleFromUser(ctx, user.id, ctx.env.MUTED_ROLE_ID);
+      await removeRoleFromUser(ctx, member.user.id, ctx.env.MUTED_ROLE_ID);
 
       return response.status(200).send({
         type: 4,
         data: {
           flags: MessageFlags.Ephemeral,
-          content: `✅ Successfully unmuted <@${user.id}>`,
+          content: `✅ Successfully unmuted <@${member.user.id}>`,
         },
       });
     },
