@@ -141,6 +141,7 @@ export const Commands: Command[] = [
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const id = body.data.options?.find((item) => item.name == 'user')?.value;
       const support = (body.data.options?.find((item) => item.name == 'support')?.value as boolean) || false;
+      const shame = (body.data.options?.find((item) => item.name == 'shame')?.value as boolean) || false;
       const roleId = support ? ctx.env.SUPPORT_MUTED_ROLE_ID : ctx.env.MUTED_ROLE_ID;
 
       const member = await getGuildMember(ctx, id as string);
@@ -172,7 +173,7 @@ export const Commands: Command[] = [
       return response.status(200).send({
         type: 4,
         data: {
-          flags: MessageFlags.Ephemeral,
+          flags: shame ? null : MessageFlags.Ephemeral,
           content: `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
         },
       });
@@ -184,6 +185,7 @@ export const Commands: Command[] = [
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const id = body.data.options?.find((item) => item.name == 'user')?.value;
       const support = (body.data.options?.find((item) => item.name == 'support')?.value as boolean) || false;
+      const shame = (body.data.options?.find((item) => item.name == 'shame')?.value as boolean) || false;
       const roleId = support ? ctx.env.SUPPORT_MUTED_ROLE_ID : ctx.env.MUTED_ROLE_ID;
 
       const member = await getGuildMember(ctx, id as string);
@@ -215,7 +217,7 @@ export const Commands: Command[] = [
       return response.status(200).send({
         type: 4,
         data: {
-          flags: MessageFlags.Ephemeral,
+          flags: shame ? null : MessageFlags.Ephemeral,
           content: `✅ Successfully unmuted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
         },
       });
