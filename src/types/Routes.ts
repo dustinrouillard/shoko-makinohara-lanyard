@@ -53,8 +53,10 @@ export interface Env {
   DISCORD_TOKEN: string;
   GUILD_ID: string;
   MUTED_ROLE_ID: string;
+  SUPPORT_MUTED_ROLE_ID: string;
   OP_ROLE_ID: string;
   BG_ROLE_ID: string;
+  EVENT_LOG_WEBHOOK: string;
 
   PROMETHEUS_ENDPOINT: string;
   PROMETHEUS_USERNAME: string;

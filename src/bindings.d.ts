@@ -6,8 +6,10 @@ declare global {
   const DISCORD_TOKEN: string;
   const GUILD_ID: string;
   const MUTED_ROLE_ID: string;
+  const SUPPORT_MUTED_ROLE_ID: string;
   const OP_ROLE_ID: string;
   const BG_ROLE_ID: string;
+  const EVENT_LOG_WEBHOOK: string;
 
   const PROMETHEUS_ENDPOINT: string;
   const PROMETHEUS_USERNAME: string;

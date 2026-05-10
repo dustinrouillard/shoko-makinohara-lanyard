@@ -24,7 +24,7 @@ export interface Data {
 export interface CommandOptions {
   name: string;
   type: number;
-  value: string;
+  value: string | number | boolean;
   options?: CommandOptions[];
 }
 

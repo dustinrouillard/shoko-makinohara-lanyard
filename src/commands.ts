@@ -9,6 +9,7 @@ import { getValue, getValueIncrease } from './utils/metrics';
 import { addRoleToUser, bulkDeleteMessages, getChannelMessages, getDiscordUser, getGuildMember, getLanyardMember, idToTimestamp, removeRoleFromUser } from './utils/discord';
 import { chunk } from './utils/array';
 import { Message } from './types/Discord';
+import { EventType, sendUserEvent } from './utils/events';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -71,6 +72,11 @@ export const Commands: Command[] = [
 
       await addRoleToUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
 
+      await sendUserEvent(ctx.env, EventType.UserOpped, {
+        actor: user.id,
+        target: member.user.id,
+      });
+
       return response.status(200).send({
         type: 4,
         data: {
@@ -115,6 +121,11 @@ export const Commands: Command[] = [
 
       await removeRoleFromUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
 
+      await sendUserEvent(ctx.env, EventType.UserDeopped, {
+        actor: user.id,
+        target: member.user.id,
+      });
+
       return response.status(200).send({
         type: 4,
         data: {
@@ -129,6 +140,9 @@ export const Commands: Command[] = [
     description: 'Assigns the Muted role to the specified user',
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const support = (body.data.options?.find((item) => item.name == 'support')?.value as boolean) || false;
+      const roleId = support ? ctx.env.SUPPORT_MUTED_ROLE_ID : ctx.env.MUTED_ROLE_ID;
+
       const member = await getGuildMember(ctx, id as string);
       if (!member)
         return response.status(200).send({
@@ -139,22 +153,27 @@ export const Commands: Command[] = [
           },
         });
 
-      if (member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
+      if (member.roles.find((role) => role == roleId))
         return response.status(200).send({
           type: 4,
           data: {
             flags: MessageFlags.Ephemeral,
-            content: 'That user is already muted',
+            content: `That user is already ${support ? ' support ' : ''}muted`,
           },
         });
 
-      await addRoleToUser(ctx, member.user.id, ctx.env.MUTED_ROLE_ID);
+      await addRoleToUser(ctx, member.user.id, roleId);
+
+      await sendUserEvent(ctx.env, support ? EventType.UserSupportMuted : EventType.UserMuted, {
+        actor: user.id,
+        target: member.user.id,
+      });
 
       return response.status(200).send({
         type: 4,
         data: {
           flags: MessageFlags.Ephemeral,
-          content: `✅ Successfully muted <@${member.user.id}>`,
+          content: `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
         },
       });
     },
@@ -164,6 +183,9 @@ export const Commands: Command[] = [
     description: 'Removes the Muted role from the specified user',
     function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const id = body.data.options?.find((item) => item.name == 'user')?.value;
+      const support = (body.data.options?.find((item) => item.name == 'support')?.value as boolean) || false;
+      const roleId = support ? ctx.env.SUPPORT_MUTED_ROLE_ID : ctx.env.MUTED_ROLE_ID;
+
       const member = await getGuildMember(ctx, id as string);
       if (!member)
         return response.status(200).send({
@@ -174,22 +196,27 @@ export const Commands: Command[] = [
           },
         });
 
-      if (!member.roles.find((role) => role == ctx.env.MUTED_ROLE_ID))
+      if (!member.roles.find((role) => role == roleId))
         return response.status(200).send({
           type: 4,
           data: {
             flags: MessageFlags.Ephemeral,
-            content: 'That user is not currently muted',
+            content: `That user is not currently ${support ? 'support ' : ''}muted`,
           },
         });
 
-      await removeRoleFromUser(ctx, member.user.id, ctx.env.MUTED_ROLE_ID);
+      await removeRoleFromUser(ctx, member.user.id, roleId);
+
+      await sendUserEvent(ctx.env, support ? EventType.UserSupportUnmuted : EventType.UserUnmuted, {
+        actor: user.id,
+        target: member.user.id,
+      });
 
       return response.status(200).send({
         type: 4,
         data: {
           flags: MessageFlags.Ephemeral,
-          content: `✅ Successfully unmuted <@${member.user.id}>`,
+          content: `✅ Successfully unmuted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
         },
       });
     },
@@ -224,7 +251,7 @@ export const Commands: Command[] = [
           break;
         }
         case 'after': {
-          const after = commandOptions.find((option) => option.name === 'message')?.value;
+          const after = commandOptions.find((option) => option.name === 'message')?.value as string;
 
           const messages = await getChannelMessages(context, body.channel_id, { after, limit: 100 });
           const chunks = chunk<Message>(messages, 100);
@@ -280,7 +307,7 @@ export const Commands: Command[] = [
     description: 'Returns your Lanyard/Discord user info',
     post_channels: ['911712979291086919', '927757958010503171'],
     prehandler: async (context: Context, body: DiscordInteraction, user: User) => {
-      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+      const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
       const lanyard = await fetchLanyardUser(id);
       const discord = await getDiscordUser(context, id);
 
@@ -375,7 +402,7 @@ export const Commands: Command[] = [
     post_channels: ['911712979291086919', '927757958010503171'],
     description: 'Returns users Lanyard K/V pairs',
     embed: async (context: Context, body: DiscordInteraction, user: User) => {
-      const id = body.data.options?.find((item) => item.name == 'user')?.value || user.id;
+      const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
       const lanyard = await fetchLanyardUser(id);
       return {
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
