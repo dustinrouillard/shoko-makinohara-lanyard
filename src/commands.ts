@@ -10,6 +10,7 @@ import { addRoleToUser, bulkDeleteMessages, getChannelMessages, getDiscordUser, 
 import { chunk } from './utils/array';
 import { Message } from './types/Discord';
 import { EventType, sendUserEvent } from './utils/events';
+import { automod, normalizeType, PhashListResponse, validatePhash } from './utils/automod';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -293,6 +294,105 @@ export const Commands: Command[] = [
           content: `Done ✅ \`Removed ${deleted.length.toLocaleString()} messages\``,
         },
       });
+    },
+  },
+  {
+    command: 'phash',
+    description: 'Manage automod pHash detections',
+    function: async (ctx: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const subcommand = body.data.options?.[0]?.name;
+      const options = body.data.options?.[0]?.options ?? [];
+
+      const reply = (content: string) =>
+        response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content,
+          },
+        });
+
+      switch (subcommand) {
+        case 'add': {
+          const phashInput = (options.find((o) => o.name === 'phash')?.value as string) || '';
+          const typeInput = (options.find((o) => o.name === 'type')?.value as string) || '';
+
+          const phash = validatePhash(phashInput);
+          const type = normalizeType(typeInput);
+          if (!phash || !type) return reply('Both phash and type are required.');
+
+          const res = await automod(ctx.env, 'POST', '/v1/phashes', { phash, type });
+          if (res.status === 201) return reply(`Added pHash \`${phash}\` as type \`${type}\`.`);
+          if (res.status === 400) {
+            const body: { code?: string } = await res.json().catch(() => ({}));
+            if (body.code === 'missing_field') return reply('Both phash and type are required.');
+          }
+          return reply('Failed to reach automod API.');
+        }
+        case 'remove': {
+          const phashInput = (options.find((o) => o.name === 'phash')?.value as string) || '';
+          const phash = validatePhash(phashInput);
+          if (!phash) return reply('Invalid phash.');
+
+          const res = await automod(ctx.env, 'DELETE', `/v1/phashes/${encodeURIComponent(phash)}`);
+          if (res.status === 204) return reply(`Removed pHash \`${phash}\`.`);
+          if (res.status === 404) return reply(`No such pHash: \`${phash}\`.`);
+          return reply('Failed to reach automod API.');
+        }
+        case 'list': {
+          const res = await automod(ctx.env, 'GET', '/v1/phashes');
+          if (res.status !== 200) return reply('Failed to reach automod API.');
+
+          const { phashes } = (await res.json()) as PhashListResponse;
+          if (!phashes.length) return reply('No pHashes tracked.');
+
+          const groups: Record<string, string[]> = {};
+          for (const p of phashes) (groups[p.type] ||= []).push(p.phash);
+
+          const lines: string[] = [];
+          for (const [type, hashes] of Object.entries(groups)) {
+            lines.push(`${type} (${hashes.length}):`);
+            lines.push(`  ${hashes.join(', ')}`);
+          }
+
+          const block = `\`\`\`\n${lines.join('\n')}\n\`\`\``;
+          if (block.length <= 4096) {
+            return response.status(200).send({
+              type: 4,
+              data: {
+                flags: MessageFlags.Ephemeral,
+                embeds: [
+                  {
+                    title: 'Tracked pHashes',
+                    description: block,
+                    color: 0x4f46e5,
+                    footer: { text: `${phashes.length} entries` },
+                  },
+                ],
+              },
+            });
+          }
+
+          const summary = Object.entries(groups)
+            .map(([type, hashes]) => `\`${type}\` — ${hashes.length}`)
+            .join('\n');
+          return response.status(200).send({
+            type: 4,
+            data: {
+              flags: MessageFlags.Ephemeral,
+              embeds: [
+                {
+                  title: 'Tracked pHashes',
+                  description: `${phashes.length} entries — too many to inline.\n\n${summary}`,
+                  color: 0x4f46e5,
+                },
+              ],
+            },
+          });
+        }
+        default:
+          return reply('Unknown subcommand.');
+      }
     },
   },
   {

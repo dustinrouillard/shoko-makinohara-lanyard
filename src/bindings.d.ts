@@ -15,5 +15,8 @@ declare global {
   const PROMETHEUS_USERNAME: string;
   const PROMETHEUS_PASSWORD: string;
 
+  const AUTOMOD_API_URL: string;
+  const AUTOMOD_API_TOKEN: string;
+
   const Storage: KVNamespace;
 }

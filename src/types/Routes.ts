@@ -62,5 +62,8 @@ export interface Env {
   PROMETHEUS_USERNAME: string;
   PROMETHEUS_PASSWORD: string;
 
+  AUTOMOD_API_URL: string;
+  AUTOMOD_API_TOKEN: string;
+
   Storage: KVNamespace;
 }
