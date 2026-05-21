@@ -27,6 +27,29 @@ const eventColors = {
   [EventType.UserDeopped]: 0xd97706,
 };
 
+export async function sendPhashReportEvent(
+  env: Env,
+  data: { actor: string; message_link: string; type: string; reason: string; added: number; duplicates: number; errors: number; deleted: boolean },
+) {
+  const embed = {
+    title: 'Images reported to pHash automod',
+    color: 0x6366f1,
+    fields: [
+      { name: 'Actor', value: `<@${data.actor}>`, inline: true },
+      { name: 'Type', value: `\`${data.type}\``, inline: true },
+      { name: 'Added / Duplicates / Errors', value: `${data.added} / ${data.duplicates} / ${data.errors}`, inline: true },
+      { name: 'Message', value: `${data.message_link}${data.deleted ? ' (deleted)' : ''}` },
+      { name: 'Reason', value: data.reason },
+    ],
+  };
+
+  await fetch(env.EVENT_LOG_WEBHOOK, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ embeds: [embed] }),
+  });
+}
+
 export async function sendUserEvent(env: Env, type: EventType, data: { actor: string; target: string }) {
   const embed = {
     title: eventTitle[type],

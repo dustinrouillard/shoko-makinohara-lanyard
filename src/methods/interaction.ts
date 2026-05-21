@@ -1,5 +1,5 @@
 import { Command, Commands } from '../commands';
-import { Context, Interaction, Interactions } from '../interactions';
+import { ComponentHandlers, Context, Interaction, Interactions, ModalHandlers } from '../interactions';
 import type { DiscordInteraction, User } from '../types/Interaction';
 import { Embed, MessageFlags } from '../types/Message';
 import type { CraftedResponse, ParsedRequest } from '../types/Routes';
@@ -68,6 +68,38 @@ export async function processCommand(name: string, body: DiscordInteraction, req
   }
 }
 
+async function processComponent(body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
+  const customId = body.data.custom_id ?? '';
+  const handler = ComponentHandlers.find((c) => customId === c.custom_id || customId.startsWith(`${c.custom_id}:`));
+  if (!handler) return response.status(400).send('invalid request');
+
+  const user = (body.member?.user || body.user) as User;
+  const context: Context = { env: request.env };
+
+  try {
+    return await handler.handler(context, body, user, response);
+  } catch (error) {
+    console.error(error);
+    return response.status(400).send('invalid request');
+  }
+}
+
+async function processModal(body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
+  const customId = body.data.custom_id ?? '';
+  const handler = ModalHandlers.find((m) => customId === m.custom_id || customId.startsWith(`${m.custom_id}:`));
+  if (!handler) return response.status(400).send('invalid request');
+
+  const user = (body.member?.user || body.user) as User;
+  const context: Context = { env: request.env };
+
+  try {
+    return await handler.handler(context, body, user, response);
+  } catch (error) {
+    console.error(error);
+    return response.status(400).send('invalid request');
+  }
+}
+
 export async function Interaction(request: ParsedRequest<{ Body: DiscordInteraction }>, response: CraftedResponse) {
   switch (request.body.type) {
     case 1: {
@@ -76,6 +108,20 @@ export async function Interaction(request: ParsedRequest<{ Body: DiscordInteract
     case 2: {
       try {
         return processCommand(request.body.data.name, request.body, request, response);
+      } catch (error: any) {
+        return response.status(400).send(error.toString());
+      }
+    }
+    case 3: {
+      try {
+        return processComponent(request.body, request, response);
+      } catch (error: any) {
+        return response.status(400).send(error.toString());
+      }
+    }
+    case 5: {
+      try {
+        return processModal(request.body, request, response);
       } catch (error: any) {
         return response.status(400).send(error.toString());
       }

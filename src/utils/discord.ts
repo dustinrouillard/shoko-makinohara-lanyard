@@ -51,6 +51,22 @@ export async function getChannelMessages(
   return data;
 }
 
+export async function getChannelMessage(context: Record<string, any> & { env: Env }, channel_id: string, message_id: string): Promise<Message | null> {
+  const res = await fetch(`https://discord.com/api/v9/channels/${channel_id}/messages/${message_id}`, {
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
+  });
+  if (res.status !== 200) return null;
+  return (await res.json()) as Message;
+}
+
+export async function deleteChannelMessage(context: Record<string, any> & { env: Env }, channel_id: string, message_id: string): Promise<boolean> {
+  const res = await fetch(`https://discord.com/api/v9/channels/${channel_id}/messages/${message_id}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
+  });
+  return res.status === 204;
+}
+
 export async function bulkDeleteMessages(context: Record<string, any> & { env: Env }, id: string, messages: string[]): Promise<Response> {
   const req = await fetch(`https://discord.com/api/v9/channels/${id}/messages/bulk-delete`, {
     method: 'POST',

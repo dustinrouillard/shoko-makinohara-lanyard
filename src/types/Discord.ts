@@ -8,9 +8,32 @@ export interface User {
   banner_color: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  url: string;
+  proxy_url?: string;
+  content_type?: string;
+  size: number;
+}
+
+export interface EmbedImage {
+  url: string;
+  proxy_url?: string;
+}
+
+export interface MessageEmbed {
+  type?: string;
+  url?: string;
+  image?: EmbedImage;
+  thumbnail?: EmbedImage;
+}
+
 export interface Message {
   id: string;
   content: string;
+  attachments?: Attachment[];
+  embeds?: MessageEmbed[];
 }
 
 export interface Member {

@@ -1,3 +1,5 @@
+import { Message } from './Discord';
+
 export interface DiscordInteraction {
   application_id: string;
   channel_id: string;
@@ -8,6 +10,7 @@ export interface DiscordInteraction {
   locale: string;
   user?: User;
   member?: Member;
+  message?: Message;
   token: string;
   type: number;
   version: number;
@@ -19,6 +22,24 @@ export interface Data {
   type: number;
   target_id?: string;
   options?: CommandOptions[];
+  custom_id?: string;
+  components?: ModalSubmitActionRow[];
+  resolved?: ResolvedData;
+}
+
+export interface ResolvedData {
+  messages?: Record<string, Message>;
+}
+
+export interface ModalSubmitTextInput {
+  type: 4;
+  custom_id: string;
+  value: string;
+}
+
+export interface ModalSubmitActionRow {
+  type: 1;
+  components: ModalSubmitTextInput[];
 }
 
 export interface CommandOptions {
