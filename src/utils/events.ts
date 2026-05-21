@@ -1,5 +1,16 @@
 import { Env } from '../types/Routes';
 
+async function postEventEmbed(env: Env, embed: Record<string, unknown>) {
+  return fetch(`https://discord.com/api/v10/channels/${env.EVENT_LOG_CHANNEL_ID}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bot ${env.EVENT_LOG_BOT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ embeds: [embed] }),
+  });
+}
+
 export enum EventType {
   UserMuted,
   UserUnmuted,
@@ -7,6 +18,7 @@ export enum EventType {
   UserSupportUnmuted,
   UserOpped,
   UserDeopped,
+  UserKicked,
 }
 
 const eventTitle = {
@@ -16,6 +28,7 @@ const eventTitle = {
   [EventType.UserSupportUnmuted]: 'User unrestricted from support chats',
   [EventType.UserOpped]: 'User was opped',
   [EventType.UserDeopped]: 'User was deopped',
+  [EventType.UserKicked]: 'User was kicked',
 };
 
 const eventColors = {
@@ -25,12 +38,14 @@ const eventColors = {
   [EventType.UserSupportUnmuted]: 0x34d399,
   [EventType.UserOpped]: 0xf59e0b,
   [EventType.UserDeopped]: 0xd97706,
+  [EventType.UserKicked]: 0xdc2626,
 };
 
 export async function sendPhashReportEvent(
   env: Env,
-  data: { actor: string; message_link: string; type: string; reason: string; added: number; duplicates: number; errors: number; deleted: boolean },
+  data: { actor: string; message_link: string; type: string; reason: string; added: number; duplicates: number; errors: number; phashes: string },
 ) {
+  const phashesValue = data.phashes.length > 1024 ? `${data.phashes.slice(0, 1020)}…` : data.phashes;
   const embed = {
     title: 'Images reported to pHash automod',
     color: 0x6366f1,
@@ -38,16 +53,13 @@ export async function sendPhashReportEvent(
       { name: 'Actor', value: `<@${data.actor}>`, inline: true },
       { name: 'Type', value: `\`${data.type}\``, inline: true },
       { name: 'Added / Duplicates / Errors', value: `${data.added} / ${data.duplicates} / ${data.errors}`, inline: true },
-      { name: 'Message', value: `${data.message_link}${data.deleted ? ' (deleted)' : ''}` },
+      { name: 'Message', value: data.message_link },
+      { name: 'pHashes', value: phashesValue || '*(none)*' },
       { name: 'Reason', value: data.reason },
     ],
   };
 
-  await fetch(env.EVENT_LOG_WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ embeds: [embed] }),
-  });
+  await postEventEmbed(env, embed);
 }
 
 export async function sendUserEvent(env: Env, type: EventType, data: { actor: string; target: string }) {
@@ -68,13 +80,5 @@ export async function sendUserEvent(env: Env, type: EventType, data: { actor: st
     ],
   };
 
-  const response = await fetch(env.EVENT_LOG_WEBHOOK, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ embeds: [embed] }),
-  });
-
-  return;
+  await postEventEmbed(env, embed);
 }

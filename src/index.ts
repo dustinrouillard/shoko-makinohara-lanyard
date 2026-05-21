@@ -4,7 +4,7 @@ import { CraftedResponse, Env, Method, ParsedRequest } from './types/Routes';
 import { NotFound } from './methods/notfound';
 
 export default {
-  async fetch(_request: Request, env: Env): Promise<Response> {
+  async fetch(_request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return new Promise(async (resolve) => {
       const url = new URL(_request.url);
 
@@ -34,7 +34,8 @@ export default {
         query,
         url,
         env,
-        cloudflare: request.cf
+        cloudflare: request.cf,
+        waitUntil: ctx.waitUntil.bind(ctx),
       };
 
       const res: CraftedResponse = {

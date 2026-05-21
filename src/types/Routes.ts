@@ -25,6 +25,7 @@ export interface ParsedRequest<RG extends RouteGeneric = RouteGeneric> {
   url: URL;
   env: Env;
   cloudflare?: IncomingRequestCfProperties;
+  waitUntil: (promise: Promise<any>) => void;
 }
 
 export interface CraftedResponse {
@@ -56,7 +57,8 @@ export interface Env {
   SUPPORT_MUTED_ROLE_ID: string;
   OP_ROLE_ID: string;
   BG_ROLE_ID: string;
-  EVENT_LOG_WEBHOOK: string;
+  EVENT_LOG_CHANNEL_ID: string;
+  EVENT_LOG_BOT_TOKEN: string;
 
   PROMETHEUS_ENDPOINT: string;
   PROMETHEUS_USERNAME: string;

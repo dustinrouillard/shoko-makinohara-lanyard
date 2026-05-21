@@ -4,8 +4,8 @@ import { Component, Embed, MessageFlags } from './types/Message';
 import { CraftedResponse, Env, ParsedRequest } from './types/Routes';
 import { chunk } from './utils/array';
 import { addPhashesFromUrls, normalizeType } from './utils/automod';
-import { bulkDeleteMessages, deleteChannelMessage, getChannelMessage, getChannelMessages } from './utils/discord';
-import { sendPhashReportEvent } from './utils/events';
+import { bulkDeleteMessages, deleteChannelMessage, editOriginalInteractionResponse, getChannelMessage, getChannelMessages, kickGuildMember } from './utils/discord';
+import { EventType, sendPhashReportEvent, sendUserEvent } from './utils/events';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -168,7 +168,126 @@ export const ComponentHandlers: ComponentHandler[] = [
       return response.status(200).send(phashScamModalResponse(body.channel_id, message.id, images.length));
     },
   },
+  {
+    custom_id: 'phash_delete',
+    handler: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const [, channelId, messageId] = (body.data.custom_id ?? '').split(':');
+      if (!channelId || !messageId) {
+        return response.status(200).send({ type: 7, data: { content: 'Invalid reference.', components: [] } });
+      }
+
+      const ok = await deleteChannelMessage(context, channelId, messageId).catch(() => false);
+
+      const original = (body.message as any)?.content ?? '';
+      const remaining = (body.message as any)?.components?.[0]?.components?.filter((c: any) => !String(c.custom_id ?? '').startsWith('phash_delete')) ?? [];
+      const newComponents = remaining.length ? [{ type: 1, components: remaining }] : [];
+
+      return response.status(200).send({
+        type: 7,
+        data: {
+          content: `${original}\n${ok ? '🗑️ Message deleted.' : '⚠️ Could not delete message.'}`,
+          components: newComponents,
+        },
+      });
+    },
+  },
+  {
+    custom_id: 'phash_kick',
+    handler: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
+      const [, userId] = (body.data.custom_id ?? '').split(':');
+      if (!userId) {
+        return response.status(200).send({ type: 7, data: { content: 'Invalid reference.', components: [] } });
+      }
+
+      const ok = await kickGuildMember(context, userId, `Kicked by ${user.username} via pHash report`).catch(() => false);
+      if (ok) {
+        await sendUserEvent(context.env, EventType.UserKicked, { actor: user.id, target: userId });
+      }
+
+      const original = (body.message as any)?.content ?? '';
+      const remaining = (body.message as any)?.components?.[0]?.components?.filter((c: any) => !String(c.custom_id ?? '').startsWith('phash_kick')) ?? [];
+      const newComponents = remaining.length ? [{ type: 1, components: remaining }] : [];
+
+      return response.status(200).send({
+        type: 7,
+        data: {
+          content: `${original}\n${ok ? `👢 <@${userId}> kicked.` : `⚠️ Could not kick <@${userId}>.`}`,
+          components: newComponents,
+        },
+      });
+    },
+  },
 ];
+
+async function runPhashReport(
+  context: Context,
+  body: DiscordInteraction,
+  user: User,
+  channelId: string,
+  messageId: string,
+  type: string,
+  reason: string,
+) {
+  const followup = (content: string, components: any[] = []) =>
+    editOriginalInteractionResponse(body.application_id, body.token, { content, components });
+
+  const message = await getChannelMessage(context, channelId, messageId);
+  const images = collectImageUrls(message);
+  if (images.length === 0) return followup('That message no longer has any images to hash.');
+
+  const results = await addPhashesFromUrls(context.env, images, type);
+  if (!results) return followup('Failed to reach automod API.');
+
+  const added = results.filter((r) => r.added).length;
+  const duplicates = results.filter((r) => r.already_existed).length;
+  const errors = results.filter((r) => r.error).length;
+
+  const lines = results.map((r) => {
+    if (r.error) return `❌ \`${r.source}\` — ${r.error}`;
+    if (r.already_existed) return `↩️ \`${r.phash}\` already tracked as \`${r.type}\``;
+    return `✅ \`${r.phash}\` added as \`${r.type}\``;
+  });
+
+  const messageLink = `https://discord.com/channels/${context.env.GUILD_ID}/${channelId}/${messageId}`;
+  await sendPhashReportEvent(context.env, {
+    actor: user.id,
+    message_link: messageLink,
+    type,
+    reason,
+    added,
+    duplicates,
+    errors,
+    phashes: lines.join('\n'),
+  });
+
+  const authorId = message?.author?.id;
+  const isBot = !!message?.author?.bot;
+  const showKick = !!authorId && !isBot && authorId !== user.id;
+
+  const buttons: any[] = [
+    {
+      type: 2,
+      style: 4,
+      label: 'Delete message',
+      custom_id: `phash_delete:${channelId}:${messageId}`,
+      emoji: { name: '🗑️' },
+    },
+  ];
+  if (showKick) {
+    buttons.push({
+      type: 2,
+      style: 4,
+      label: 'Kick member',
+      custom_id: `phash_kick:${authorId}`,
+      emoji: { name: '👢' },
+    });
+  }
+
+  return followup(
+    `Reported as \`${type}\` — **${added}** added, **${duplicates}** duplicate, **${errors}** failed.\n${lines.join('\n')}`,
+    [{ type: 1, components: buttons }],
+  );
+}
 
 export const ModalHandlers: ModalHandler[] = [
   {
@@ -191,39 +310,20 @@ export const ModalHandlers: ModalHandler[] = [
       if (!type) return reply('Invalid type — must be UPPER_SNAKE_CASE (1–40 chars).');
       if (!reason) return reply('A reason is required.');
 
-      const message = await getChannelMessage(context, channelId, messageId);
-      const images = collectImageUrls(message);
-      if (images.length === 0) return reply('That message no longer has any images to hash.');
-
-      const results = await addPhashesFromUrls(context.env, images, type);
-      if (!results) return reply('Failed to reach automod API.');
-
-      const added = results.filter((r) => r.added).length;
-      const duplicates = results.filter((r) => r.already_existed).length;
-      const errors = results.filter((r) => r.error).length;
-
-      const deleted = await deleteChannelMessage(context, channelId, messageId).catch(() => false);
-
-      const messageLink = `https://discord.com/channels/${context.env.GUILD_ID}/${channelId}/${messageId}`;
-      await sendPhashReportEvent(context.env, {
-        actor: user.id,
-        message_link: messageLink,
-        type,
-        reason,
-        added,
-        duplicates,
-        errors,
-        deleted,
+      response.status(200).send({
+        type: 5,
+        data: { flags: MessageFlags.Ephemeral },
       });
 
-      const lines = results.map((r) => {
-        if (r.error) return `❌ \`${r.source}\` — ${r.error}`;
-        if (r.already_existed) return `↩️ \`${r.phash}\` already tracked as \`${r.type}\``;
-        return `✅ \`${r.phash}\` added as \`${r.type}\``;
-      });
-
-      const deleteLine = deleted ? '🗑️ Original message deleted.' : '⚠️ Could not delete original message.';
-      return reply(`Reported as \`${type}\` — **${added}** added, **${duplicates}** duplicate, **${errors}** failed.\n${deleteLine}\n${lines.join('\n')}`);
+      context.waitUntil(
+        runPhashReport(context, body, user, channelId, messageId, type, reason).catch((error) => {
+          console.error('phash report failed', error);
+          return editOriginalInteractionResponse(body.application_id, body.token, {
+            content: 'Failed to process pHash report — check logs.',
+            components: [],
+          });
+        }),
+      );
     },
   },
 ];

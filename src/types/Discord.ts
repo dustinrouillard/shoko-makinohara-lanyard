@@ -29,11 +29,18 @@ export interface MessageEmbed {
   thumbnail?: EmbedImage;
 }
 
+export interface MessageAuthor {
+  id: string;
+  bot?: boolean;
+  username?: string;
+}
+
 export interface Message {
   id: string;
   content: string;
   attachments?: Attachment[];
   embeds?: MessageEmbed[];
+  author?: MessageAuthor;
 }
 
 export interface Member {

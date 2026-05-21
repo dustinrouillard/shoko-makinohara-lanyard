@@ -90,7 +90,7 @@ async function processModal(body: DiscordInteraction, request: ParsedRequest, re
   if (!handler) return response.status(400).send('invalid request');
 
   const user = (body.member?.user || body.user) as User;
-  const context: Context = { env: request.env };
+  const context: Context = { env: request.env, waitUntil: request.waitUntil };
 
   try {
     return await handler.handler(context, body, user, response);

@@ -9,7 +9,8 @@ declare global {
   const SUPPORT_MUTED_ROLE_ID: string;
   const OP_ROLE_ID: string;
   const BG_ROLE_ID: string;
-  const EVENT_LOG_WEBHOOK: string;
+  const EVENT_LOG_CHANNEL_ID: string;
+  const EVENT_LOG_BOT_TOKEN: string;
 
   const PROMETHEUS_ENDPOINT: string;
   const PROMETHEUS_USERNAME: string;

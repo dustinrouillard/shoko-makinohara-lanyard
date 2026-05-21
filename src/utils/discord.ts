@@ -67,6 +67,29 @@ export async function deleteChannelMessage(context: Record<string, any> & { env:
   return res.status === 204;
 }
 
+export async function editOriginalInteractionResponse(
+  application_id: string,
+  token: string,
+  body: { content?: string; embeds?: any[]; components?: any[] },
+): Promise<boolean> {
+  const res = await fetch(`https://discord.com/api/v10/webhooks/${application_id}/${token}/messages/@original`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.ok;
+}
+
+export async function kickGuildMember(context: Record<string, any> & { env: Env }, user_id: string, reason?: string): Promise<boolean> {
+  const headers: Record<string, string> = { authorization: `Bot ${context.env.DISCORD_TOKEN}` };
+  if (reason) headers['X-Audit-Log-Reason'] = encodeURIComponent(reason);
+  const res = await fetch(`https://discord.com/api/v9/guilds/${context.env.GUILD_ID}/members/${user_id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  return res.status === 204;
+}
+
 export async function bulkDeleteMessages(context: Record<string, any> & { env: Env }, id: string, messages: string[]): Promise<Response> {
   const req = await fetch(`https://discord.com/api/v9/channels/${id}/messages/bulk-delete`, {
     method: 'POST',
