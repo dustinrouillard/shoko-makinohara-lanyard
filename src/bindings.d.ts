@@ -11,6 +11,7 @@ declare global {
   const BG_ROLE_ID: string;
   const EVENT_LOG_CHANNEL_ID: string;
   const EVENT_LOG_BOT_TOKEN: string;
+  const MOD_CHANNEL_ID: string;
 
   const PROMETHEUS_ENDPOINT: string;
   const PROMETHEUS_USERNAME: string;

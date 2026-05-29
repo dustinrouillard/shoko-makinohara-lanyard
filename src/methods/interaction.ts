@@ -15,7 +15,8 @@ export async function processCommand(name: string, body: DiscordInteraction, req
   await trackCommand(name, request.env);
 
   const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
-  const post_channel = command.post_channels && command.post_channels.includes(body.channel_id);
+  const in_mod_channel = !!request.env.MOD_CHANNEL_ID && body.channel_id === request.env.MOD_CHANNEL_ID;
+  const post_channel = in_mod_channel || (command.post_channels && command.post_channels.includes(body.channel_id));
   const flags = post_channel || !body.channel_id ? null : ephemeral ? MessageFlags.Ephemeral : null;
 
   const user = (body.member?.user || body.user) as User;

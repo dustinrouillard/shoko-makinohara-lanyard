@@ -59,6 +59,7 @@ export interface Env {
   BG_ROLE_ID: string;
   EVENT_LOG_CHANNEL_ID: string;
   EVENT_LOG_BOT_TOKEN: string;
+  MOD_CHANNEL_ID: string;
 
   PROMETHEUS_ENDPOINT: string;
   PROMETHEUS_USERNAME: string;
