@@ -6,11 +6,20 @@ import { DiscordInteraction, User } from './types/Interaction';
 import { getAllStats, getGuildStats } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
-import { addRoleToUser, bulkDeleteMessages, getChannelMessages, getDiscordUser, getGuildMember, getLanyardMember, idToTimestamp, removeRoleFromUser } from './utils/discord';
+import {
+  addRoleToUser,
+  bulkDeleteMessages,
+  getChannelMessages,
+  getDiscordUser,
+  getGuildMember,
+  getLanyardMember,
+  idToTimestamp,
+  removeRoleFromUser,
+} from './utils/discord';
 import { chunk } from './utils/array';
 import { Message } from './types/Discord';
 import { EventType, sendUserEvent } from './utils/events';
-import { automod, normalizeType, PhashListResponse, validatePhash } from './utils/automod';
+import { automod, listServerTagMembers, normalizeType, PhashListResponse, validatePhash } from './utils/automod';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -693,6 +702,36 @@ export const Commands: Command[] = [
       description: `Current command usage statistics\n\n${(await getAllStats(request.env)).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
       color: 0x849203,
     }),
+  },
+  {
+    command: 'tag',
+    description: 'Shows how many users are wearing the LNYD server tag',
+    embed: async (ctx: Context) => {
+      const data = await listServerTagMembers(ctx.env);
+      if (!data) {
+        return {
+          title: 'LNYD Server Tag',
+          description: 'Failed to reach automod API.',
+          color: 0x726311,
+        };
+      }
+
+      if (!data.ready) {
+        return {
+          title: 'LNYD Server Tag',
+          description: 'The server-tag cache is still warming up. Try again in a moment.',
+          color: 0x726311,
+        };
+      }
+
+      const count = data.members.length;
+      const noun = count === 1 ? 'person is' : 'people are';
+      return {
+        title: 'LNYD Server Tag',
+        description: `**${count.toLocaleString()}** ${noun} currently repping the LNYD server tag.`,
+        color: 0xef2123,
+      };
+    },
   },
   {
     command: ['banners', 'bios'],

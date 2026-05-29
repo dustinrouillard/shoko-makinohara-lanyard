@@ -9,6 +9,23 @@ export interface PhashListResponse {
   phashes: Phash[];
 }
 
+export interface ServerTagMember {
+  id: string;
+  username: string;
+  global_name: string | null;
+}
+
+export interface ServerTagMembersResponse {
+  members: ServerTagMember[];
+  ready: boolean;
+}
+
+export async function listServerTagMembers(env: Env): Promise<ServerTagMembersResponse | null> {
+  const res = await automod(env, 'GET', '/v1/server-tag-members');
+  if (res.status !== 200) return null;
+  return (await res.json()) as ServerTagMembersResponse;
+}
+
 export interface PhashFromImagesResult {
   source: string;
   phash?: string;
