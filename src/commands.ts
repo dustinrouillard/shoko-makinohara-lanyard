@@ -37,6 +37,15 @@ export interface Command {
 
 export const Commands: Command[] = [
   {
+    command: 'terms',
+    description: 'Returns links to the privacy policy and terms of service',
+    embed: () => ({
+      title: 'About Shoko Makinohara',
+      description: `Shoko Makinohara is the bot for the Lanyard Discord server.\n\n**Shoko Makinohara (this bot)** — slash commands and automated moderation\n[Terms of Service](https://shoko-discord.dstn.to/terms) · [Privacy Policy](https://shoko-discord.dstn.to/privacy)\n\n**Lanyard (the service)** — the public presence/profile API at \`api.lanyard.rest\`\n[Terms of Service](https://shoko-discord.dstn.to/lanyard/terms) · [Privacy Policy](https://shoko-discord.dstn.to/lanyard/privacy)`,
+      color: 0xef2123,
+    }),
+  },
+  {
     command: 'help',
     description: 'Returns list of commands',
     embed: () => ({
