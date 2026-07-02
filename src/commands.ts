@@ -23,6 +23,9 @@ import { automod, listServerTagMembers, normalizeType, PhashListResponse, valida
 
 export type Context = Record<string, any> & { env: Env };
 
+const SHAME_GIF_URL =
+  'https://cdn.discordapp.com/attachments/1005951499429490769/1522299573257769060/shame-on-talk-off.gif';
+
 export interface Command {
   command: string | string[];
   description: string;
@@ -194,6 +197,7 @@ export const Commands: Command[] = [
         data: {
           flags: shame ? null : MessageFlags.Ephemeral,
           content: `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
+          embeds: shame ? [{ image: { url: SHAME_GIF_URL } }] : undefined,
         },
       });
     },
