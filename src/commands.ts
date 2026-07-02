@@ -23,8 +23,7 @@ import { automod, listServerTagMembers, normalizeType, PhashListResponse, valida
 
 export type Context = Record<string, any> & { env: Env };
 
-const SHAME_GIF_URL =
-  'https://cdn.discordapp.com/attachments/1005951499429490769/1522299573257769060/shame-on-talk-off.gif';
+const SHAME_GIF_URL = 'https://files.dstn.to/58414fac47c74766.png';
 
 export interface Command {
   command: string | string[];
