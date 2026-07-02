@@ -23,6 +23,8 @@ import { automod, listServerTagMembers, normalizeType, PhashListResponse, valida
 
 export type Context = Record<string, any> & { env: Env };
 
+const SHAME_GIF_URL = 'https://files.dstn.to/58414fac47c74766.png';
+
 export interface Command {
   command: string | string[];
   description: string;
@@ -194,6 +196,7 @@ export const Commands: Command[] = [
         data: {
           flags: shame ? null : MessageFlags.Ephemeral,
           content: `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
+          embeds: shame ? [{ image: { url: SHAME_GIF_URL } }] : undefined,
         },
       });
     },
