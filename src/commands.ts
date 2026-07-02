@@ -23,7 +23,8 @@ import { automod, listServerTagMembers, normalizeType, PhashListResponse, valida
 
 export type Context = Record<string, any> & { env: Env };
 
-const SHAME_GIF_URL = 'https://files.dstn.to/58414fac47c74766.png';
+const SHAME_GIF_URL = 'https://cdn.dstn.to/u/58414fac47c74766.png';
+const UNMUTE_SHAME_GIF_URL = 'https://cdn.dstn.to/u/ed298fa15fb779db.png';
 
 export interface Command {
   command: string | string[];
@@ -191,12 +192,30 @@ export const Commands: Command[] = [
         target: member.user.id,
       });
 
+      const content = `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`;
+
+      if (shame) {
+        const gif = await fetch(SHAME_GIF_URL);
+        const form = new FormData();
+        form.append(
+          'payload_json',
+          JSON.stringify({
+            type: 4,
+            data: {
+              content,
+              attachments: [{ id: 0, filename: 'shame.png' }],
+            },
+          }),
+        );
+        form.append('files[0]', await gif.blob(), 'shame.png');
+        return response.status(200).send(form);
+      }
+
       return response.status(200).send({
         type: 4,
         data: {
-          flags: shame ? null : MessageFlags.Ephemeral,
-          content: `✅ Successfully muted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
-          embeds: shame ? [{ image: { url: SHAME_GIF_URL } }] : undefined,
+          flags: MessageFlags.Ephemeral,
+          content,
         },
       });
     },
@@ -236,11 +255,30 @@ export const Commands: Command[] = [
         target: member.user.id,
       });
 
+      const content = `✅ Successfully unmuted <@${member.user.id}>${support ? ' *(support)*' : ''}`;
+
+      if (shame) {
+        const gif = await fetch(UNMUTE_SHAME_GIF_URL);
+        const form = new FormData();
+        form.append(
+          'payload_json',
+          JSON.stringify({
+            type: 4,
+            data: {
+              content,
+              attachments: [{ id: 0, filename: 'shame.png' }],
+            },
+          }),
+        );
+        form.append('files[0]', await gif.blob(), 'shame.png');
+        return response.status(200).send(form);
+      }
+
       return response.status(200).send({
         type: 4,
         data: {
-          flags: shame ? null : MessageFlags.Ephemeral,
-          content: `✅ Successfully unmuted <@${member.user.id}>${support ? ' *(support)*' : ''}`,
+          flags: MessageFlags.Ephemeral,
+          content,
         },
       });
     },

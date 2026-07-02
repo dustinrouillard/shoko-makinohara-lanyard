@@ -49,8 +49,10 @@ export default {
           resolve(response);
         },
         send: (body?: any) => {
-          if (typeof body == 'object' && !res.headers['content-type']) res.headers['content-type'] = 'application/json';
-          const response = new Response(typeof body == 'object' ? JSON.stringify(body) : body, { headers: res.headers, status: res.statusCode });
+          // FormData/binary bodies pass straight through so Response can set the correct (multipart) content-type itself
+          const passthrough = body instanceof FormData || body instanceof ArrayBuffer || body instanceof Uint8Array || body instanceof Blob || body instanceof ReadableStream;
+          if (typeof body == 'object' && !passthrough && !res.headers['content-type']) res.headers['content-type'] = 'application/json';
+          const response = new Response(passthrough ? body : typeof body == 'object' ? JSON.stringify(body) : body, { headers: res.headers, status: res.statusCode });
           console.log('sending', response);
           resolve(response);
         },
