@@ -67,6 +67,15 @@ export async function deleteChannelMessage(context: Record<string, any> & { env:
   return res.status === 204;
 }
 
+export async function setChannelSlowmode(context: Record<string, any> & { env: Env }, channel_id: string, seconds: number): Promise<boolean> {
+  const res = await fetch(`https://discord.com/api/v9/channels/${channel_id}`, {
+    method: 'PATCH',
+    headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ rate_limit_per_user: seconds }),
+  });
+  return res.ok;
+}
+
 export async function editOriginalInteractionResponse(
   application_id: string,
   token: string,
