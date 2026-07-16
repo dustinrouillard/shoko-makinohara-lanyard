@@ -3,7 +3,7 @@ import { ComponentHandlers, Context, Interaction, Interactions, ModalHandlers } 
 import type { DiscordInteraction, User } from '../types/Interaction';
 import { Embed, MessageFlags } from '../types/Message';
 import type { CraftedResponse, ParsedRequest } from '../types/Routes';
-import { trackCommand } from '../utils/stats';
+import { trackCommand, trackError } from '../utils/stats';
 
 export async function processCommand(name: string, body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
   let command: Command | Interaction | undefined;
@@ -65,6 +65,7 @@ export async function processCommand(name: string, body: DiscordInteraction, req
     }
   } catch (error) {
     console.error(error);
+    await trackError(name, request.env);
     return response.status(400).send('invalid request');
   }
 }
@@ -81,6 +82,7 @@ async function processComponent(body: DiscordInteraction, request: ParsedRequest
     return await handler.handler(context, body, user, response);
   } catch (error) {
     console.error(error);
+    await trackError(`component:${handler.custom_id}`, request.env);
     return response.status(400).send('invalid request');
   }
 }
@@ -97,6 +99,7 @@ async function processModal(body: DiscordInteraction, request: ParsedRequest, re
     return await handler.handler(context, body, user, response);
   } catch (error) {
     console.error(error);
+    await trackError(`modal:${handler.custom_id}`, request.env);
     return response.status(400).send('invalid request');
   }
 }

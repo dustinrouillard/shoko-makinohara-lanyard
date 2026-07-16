@@ -1,7 +1,8 @@
 import { Env } from '../types/Routes';
+import { trackEventLog, trackModAction } from './stats';
 
 async function postEventEmbed(env: Env, embed: Record<string, unknown>) {
-  return fetch(`https://discord.com/api/v10/channels/${env.EVENT_LOG_CHANNEL_ID}/messages`, {
+  const res = await fetch(`https://discord.com/api/v10/channels/${env.EVENT_LOG_CHANNEL_ID}/messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bot ${env.EVENT_LOG_BOT_TOKEN}`,
@@ -9,6 +10,9 @@ async function postEventEmbed(env: Env, embed: Record<string, unknown>) {
     },
     body: JSON.stringify({ embeds: [embed] }),
   });
+
+  await trackEventLog(res.ok ? 'success' : 'failure', env);
+  return res;
 }
 
 export enum EventType {
@@ -41,6 +45,16 @@ const eventColors = {
   [EventType.UserKicked]: 0xdc2626,
 };
 
+const eventAction = {
+  [EventType.UserMuted]: 'mute',
+  [EventType.UserUnmuted]: 'unmute',
+  [EventType.UserSupportMuted]: 'support_mute',
+  [EventType.UserSupportUnmuted]: 'support_unmute',
+  [EventType.UserOpped]: 'op',
+  [EventType.UserDeopped]: 'deop',
+  [EventType.UserKicked]: 'kick',
+};
+
 export async function sendPhashReportEvent(
   env: Env,
   data: { actor: string; message_link: string; type: string; reason: string; added: number; duplicates: number; errors: number; phashes: string },
@@ -63,6 +77,8 @@ export async function sendPhashReportEvent(
 }
 
 export async function sendUserEvent(env: Env, type: EventType, data: { actor: string; target: string }) {
+  await trackModAction(eventAction[type], env);
+
   const embed = {
     title: eventTitle[type],
     color: eventColors[type],

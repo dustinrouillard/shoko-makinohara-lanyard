@@ -3,7 +3,7 @@ import { fetchLanyardUser } from './utils/lanyard';
 import { pullLanyardReadme } from './utils/github';
 import { Component, ComponentType, Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction, User } from './types/Interaction';
-import { getAllStats, getGuildStats } from './utils/stats';
+import { getAllStats, getErrorTotal, getGuildStats, getModStats } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
 import {
@@ -746,12 +746,28 @@ export const Commands: Command[] = [
   {
     command: 'stats',
     description: 'Shoko Makinohara Statistics',
-    embed: async (_context, _body, _user, request: ParsedRequest) => ({
-      title: 'Shoko Makinohara Stats',
-      footer: { text: `Working in ${(await getGuildStats(request.env)).toLocaleString()} guilds` },
-      description: `Current command usage statistics\n\n${(await getAllStats(request.env)).map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n')}`,
-      color: 0x849203,
-    }),
+    embed: async (_context, _body, _user, request: ParsedRequest) => {
+      const [commands, mod, errorTotal, guilds] = await Promise.all([
+        getAllStats(request.env),
+        getModStats(request.env),
+        getErrorTotal(request.env),
+        getGuildStats(request.env),
+      ]);
+
+      const commandUsage = commands.map((cmd) => `\`/${cmd.name}\` - **${cmd.stat.toLocaleString()}**`).join('\n');
+      const modUsage = mod.map((m) => `\`${m.action}\` - **${m.stat.toLocaleString()}**`).join('\n');
+
+      return {
+        title: 'Shoko Makinohara Stats',
+        footer: { text: `Working in ${guilds.toLocaleString()} guilds` },
+        description: `Current command usage statistics\n\n${commandUsage}`,
+        fields: [
+          { name: 'Moderation actions', value: modUsage || '*(none)*', inline: true },
+          { name: 'Handler errors', value: `**${errorTotal.toLocaleString()}**`, inline: true },
+        ],
+        color: 0x849203,
+      };
+    },
   },
   {
     command: 'tag',
