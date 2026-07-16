@@ -82,7 +82,7 @@ export default {
       }
 
       try {
-        route ? route.handler(req, res) : NotFound(req, res);
+        await (route ? route.handler(req, res) : NotFound(req, res));
       } catch (error) {
         console.error('error', error);
         resolve(new Response(JSON.stringify({ code: 'internal_error' }), { status: 500, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } }));

@@ -3,7 +3,7 @@ import { fetchLanyardUser } from './utils/lanyard';
 import { pullLanyardReadme } from './utils/github';
 import { Component, ComponentType, Embed, MessageFlags } from './types/Message';
 import { DiscordInteraction, User } from './types/Interaction';
-import { getAllStats, getErrorTotal, getGuildStats, getModStats } from './utils/stats';
+import { getAllStats, getErrorTotal, getEventLogStats, getGuildStats, getModStats, trackModAction, trackServiceError } from './utils/stats';
 import { msToMinSeconds } from './utils/time';
 import { getValue, getValueIncrease } from './utils/metrics';
 import {
@@ -92,7 +92,15 @@ export const Commands: Command[] = [
           },
         });
 
-      await addRoleToUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+      const opped = await addRoleToUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+      if (!opped)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: Discord rejected the role change, nothing was applied',
+          },
+        });
 
       await sendUserEvent(ctx.env, EventType.UserOpped, {
         actor: user.id,
@@ -141,7 +149,15 @@ export const Commands: Command[] = [
           },
         });
 
-      await removeRoleFromUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+      const deopped = await removeRoleFromUser(ctx, member.user.id, ctx.env.OP_ROLE_ID);
+      if (!deopped)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: Discord rejected the role change, nothing was applied',
+          },
+        });
 
       await sendUserEvent(ctx.env, EventType.UserDeopped, {
         actor: user.id,
@@ -185,7 +201,15 @@ export const Commands: Command[] = [
           },
         });
 
-      await addRoleToUser(ctx, member.user.id, roleId);
+      const muted = await addRoleToUser(ctx, member.user.id, roleId);
+      if (!muted)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: Discord rejected the role change, the user was not muted',
+          },
+        });
 
       await sendUserEvent(ctx.env, support ? EventType.UserSupportMuted : EventType.UserMuted, {
         actor: user.id,
@@ -248,7 +272,15 @@ export const Commands: Command[] = [
           },
         });
 
-      await removeRoleFromUser(ctx, member.user.id, roleId);
+      const unmuted = await removeRoleFromUser(ctx, member.user.id, roleId);
+      if (!unmuted)
+        return response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content: ':x: Discord rejected the role change, the user was not unmuted',
+          },
+        });
 
       await sendUserEvent(ctx.env, support ? EventType.UserSupportUnmuted : EventType.UserUnmuted, {
         actor: user.id,
@@ -291,6 +323,7 @@ export const Commands: Command[] = [
       const commandOptions = body.data.options?.[0]?.options ?? [];
 
       let deleted = [];
+      let failed = false;
       switch (subcommand) {
         case 'last': {
           const count = commandOptions.find((option) => option.name === 'count')?.value;
@@ -301,6 +334,7 @@ export const Commands: Command[] = [
             body.channel_id,
             messages.map((message) => message.id),
           ).catch((error: string) => {
+            failed = true;
             return response.status(200).send({
               type: 4,
               data: {
@@ -323,6 +357,7 @@ export const Commands: Command[] = [
               body.channel_id,
               chunk.map((message) => message.id),
             ).catch((error: string) => {
+              failed = true;
               console.log('Failed to delete messages, chunk', index, error);
               return response.status(200).send({
                 type: 4,
@@ -345,6 +380,8 @@ export const Commands: Command[] = [
       // Send off the messages to API for further processing
       // Good ideas here to process why messages were possibly deleted (with ai?)
       // and then use that data to send in a log channel.
+
+      if (!failed && deleted.length) await trackModAction('delete', context.env);
 
       return response.status(200).send({
         type: 4,
@@ -469,7 +506,7 @@ export const Commands: Command[] = [
     post_channels: ['911712979291086919', '927757958010503171'],
     prehandler: async (context: Context, body: DiscordInteraction, user: User) => {
       const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
-      const lanyard = await fetchLanyardUser(id);
+      const lanyard = await fetchLanyardUser(id, context.env);
       const discord = await getDiscordUser(context, id);
 
       if (!lanyard || !discord)
@@ -564,7 +601,7 @@ export const Commands: Command[] = [
     description: 'Returns users Lanyard K/V pairs',
     embed: async (context: Context, body: DiscordInteraction, user: User) => {
       const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
-      const lanyard = await fetchLanyardUser(id);
+      const lanyard = await fetchLanyardUser(id, context.env);
       return {
         title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
         description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
@@ -579,9 +616,9 @@ export const Commands: Command[] = [
     description: 'Returns various metrics from Lanyard',
     embed: async (context: Context, body: DiscordInteraction) => {
       try {
-        const monitored_users = await getValue('lanyard_monitored_users');
-        const connected_sessions = await getValue('lanyard_connected_sessions');
-        const presence_updates_hour = await getValueIncrease('lanyard_presence_updates', '1h');
+        const monitored_users = await getValue('lanyard_monitored_users', context.env);
+        const connected_sessions = await getValue('lanyard_connected_sessions', context.env);
+        const presence_updates_hour = await getValueIncrease('lanyard_presence_updates', '1h', context.env);
 
         return {
           title: 'Lanyard Metrics',
@@ -640,11 +677,11 @@ export const Commands: Command[] = [
   {
     command: 'assets',
     description: 'Learn how to handle various assets',
-    embed: async (_, user) => ({
+    embed: async (context: Context, body: DiscordInteraction, user: User) => ({
       title: 'Discord Assets',
       description: `Discord returns various things for their assets, however they're easy to convert to the cdn url so you can use them.\nYou can also read the discord developer docs page for [image formatting](https://discord.com/developers/docs/reference#image-formatting).\n\n**Avatars**\nThe API returns the hash of the avatar, which you have to combine with the ID to get the image URL\n\`https://cdn.discordapp.com/avatars/<USER_ID>/<HASH>\`\n\n**Activity Icons**\nActivity icons vary a little bit, for some apps you'll have asset IDs, and with those you can use the following structure\n\`https://cdn.discordapp.com/app-assets/<APP_ID>/<ASSET_ID>\`\n\nThen there is some application assets that use the \`mp:external\` syntax, which you have two options to handle those\n> 1: Use the replace syntax in your language of choice to add on the discord media proxy:\n> \`https://media.discordapp.net/\${activity.assets.large_image.replace("mp:", "")}\` *(Same syntax for small_image if present)*\n> 2: Ignore the media proxy and use the direct url using a regex replace\n> \`activity.assets.large_image.replace(/mp:external\\/([^\\/]*)\\/(http[s])/g, '$2:/')\` *(Would suggest option 1 due to the protections it provides the end user)*\n\nFor the activities that don't have an assets object (These are normally manually added games or games without rich presences) they don't have an easy way without a third party service to get their asset hash, however <@156114103033790464> has made a worker for this, and you can learn about it by running \`/banners\` or [here](https://dcdn.dstn.to/gist)\n\nFor all of these you can include a file extension \`.png .webp .gif .jpeg\` and or a \`size\` query param\n*Example: \`https://cdn.discordapp.com/avatars/${
         user.id
-      }/${(await fetchLanyardUser(user.id))?.data?.discord_user.avatar}.png?size=512\`*`,
+      }/${(await fetchLanyardUser(user.id, context.env))?.data?.discord_user.avatar}.png?size=512\`*`,
       color: 0x647322,
     }),
   },
@@ -652,7 +689,7 @@ export const Commands: Command[] = [
     command: 'spotify',
     description: 'Returns information about spotify data from Lanyard',
     embed: async (context: Context, body: DiscordInteraction, user: User) => {
-      const lanyard = await fetchLanyardUser(user.id);
+      const lanyard = await fetchLanyardUser(user.id, context.env);
       const currentTime = new Date().getTime();
 
       return {
@@ -682,11 +719,13 @@ export const Commands: Command[] = [
           return { count: Number(t.split('\n')[1]?.match(/1:(.*)/)?.[1] ?? 0) };
         })
         .catch(() => ({ count: 0 }));
+      if (!lanyardProfileReadmeUsers.count) await trackServiceError('cnrad', context.env);
+      const usedBy = lanyardProfileReadmeUsers.count ? ` \`Used by : ${lanyardProfileReadmeUsers.count.toLocaleString()} users\`` : '';
       return {
         title: 'Lanyard Cards and Visualizers',
         description: `Here are the links to some Lanyard visualizers and direct links to your lanyard profile on them\n\n[Lanyard Profile Readme by cnrad](https://github.com/cnrad/lanyard-profile-readme) | [View Card](https://lanyard.cnrad.dev/api/${
           user.id
-        }) \`Used by : ${lanyardProfileReadmeUsers.count.toLocaleString()} users\`\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [View Card](https://lanyard-visualizer.netlify.app/user/${
+        })${usedBy}\n[Lanyard Visualizer by EGGSY](https://github.com/eggsy/lanyard-visualizer) | [View Card](https://lanyard-visualizer.netlify.app/user/${
           user.id
         })\n\n*If there are any other visualizers you want added to this list let <@156114103033790464> know.*`,
         color: 0x893012,
@@ -696,10 +735,10 @@ export const Commands: Command[] = [
   {
     command: 'projects',
     description: 'Returns community projects that were created around Lanyard',
-    embed: async () => ({
+    embed: async (context: Context) => ({
       title: 'Lanyard Community Projects',
       description: `The Lanyard community has worked on some pretty cool projects that allows you to extend the functionality of Lanyard. [PR to add a project](https://github.com/Phineas/lanyard)!\n\n${(
-        await pullLanyardReadme()
+        await pullLanyardReadme(context.env)
       ).communityProjects
         .map((item: { link: string; description: string }) => `${item.link}\n${item.description}`)
         .join('\n\n')}`,
@@ -709,10 +748,10 @@ export const Commands: Command[] = [
   {
     command: ['showcase', 'websites'],
     description: 'Returns a curated list of websites that are using Lanyard',
-    embed: async () => ({
+    embed: async (context: Context) => ({
       title: 'Websites that use Lanyard',
       description: `Below is a curated selection of websites using Lanyard right now, check them out! Some of them will only show an activity when they're active.\n\n${(
-        await pullLanyardReadme()
+        await pullLanyardReadme(context.env)
       ).showcase.join('\n')}`,
       color: 0x298938,
     }),
@@ -747,10 +786,11 @@ export const Commands: Command[] = [
     command: 'stats',
     description: 'Shoko Makinohara Statistics',
     embed: async (_context, _body, _user, request: ParsedRequest) => {
-      const [commands, mod, errorTotal, guilds] = await Promise.all([
+      const [commands, mod, errorTotal, eventlog, guilds] = await Promise.all([
         getAllStats(request.env),
         getModStats(request.env),
         getErrorTotal(request.env),
+        getEventLogStats(request.env),
         getGuildStats(request.env),
       ]);
 
@@ -764,6 +804,7 @@ export const Commands: Command[] = [
         fields: [
           { name: 'Moderation actions', value: modUsage || '*(none)*', inline: true },
           { name: 'Handler errors', value: `**${errorTotal.toLocaleString()}**`, inline: true },
+          { name: 'Event log delivery', value: `✅ **${eventlog.success.toLocaleString()}** / ❌ **${eventlog.failure.toLocaleString()}**`, inline: true },
         ],
         color: 0x849203,
       };

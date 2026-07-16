@@ -1,4 +1,5 @@
 import { Env } from '../types/Routes';
+import { trackServiceError } from './stats';
 
 export interface Phash {
   phash: string;
@@ -21,9 +22,13 @@ export interface ServerTagMembersResponse {
 }
 
 export async function listServerTagMembers(env: Env): Promise<ServerTagMembersResponse | null> {
-  const res = await automod(env, 'GET', '/v1/server-tag-members');
-  if (res.status !== 200) return null;
-  return (await res.json()) as ServerTagMembersResponse;
+  try {
+    const res = await automod(env, 'GET', '/v1/server-tag-members');
+    if (res.status !== 200) return null;
+    return (await res.json()) as ServerTagMembersResponse;
+  } catch {
+    return null;
+  }
 }
 
 export interface PhashFromImagesResult {
@@ -40,11 +45,19 @@ export async function addPhashesFromUrls(env: Env, urls: string[], type: string)
   fd.append('type', type);
   for (const url of urls) fd.append('url', url);
 
-  const res = await fetch(`${env.AUTOMOD_API_URL}/v1/phashes/from-images`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.AUTOMOD_API_TOKEN}` },
-    body: fd,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${env.AUTOMOD_API_URL}/v1/phashes/from-images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.AUTOMOD_API_TOKEN}` },
+      body: fd,
+    });
+  } catch (error) {
+    console.error('automod api error', error);
+    await trackServiceError('automod', env);
+    return null;
+  }
+  if (res.status >= 500) await trackServiceError('automod', env);
   if (!res.ok) return null;
 
   const json = (await res.json()) as unknown;
@@ -60,14 +73,22 @@ export async function addPhashesFromUrls(env: Env, urls: string[], type: string)
 }
 
 export async function automod(env: Env, method: string, path: string, body?: unknown): Promise<Response> {
-  return fetch(`${env.AUTOMOD_API_URL}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${env.AUTOMOD_API_TOKEN}`,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${env.AUTOMOD_API_URL}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${env.AUTOMOD_API_TOKEN}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (error) {
+    await trackServiceError('automod', env);
+    throw error;
+  }
+  if (res.status >= 500) await trackServiceError('automod', env);
+  return res;
 }
 
 const PHASH_RE = /^[A-Za-z0-9+/=_-]{1,64}$/;

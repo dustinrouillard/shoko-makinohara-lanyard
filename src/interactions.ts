@@ -6,6 +6,7 @@ import { chunk } from './utils/array';
 import { addPhashesFromUrls, normalizeType } from './utils/automod';
 import { bulkDeleteMessages, deleteChannelMessage, editOriginalInteractionResponse, getChannelMessage, getChannelMessages, kickGuildMember } from './utils/discord';
 import { EventType, sendPhashReportEvent, sendUserEvent } from './utils/events';
+import { trackModAction } from './utils/stats';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -111,6 +112,7 @@ export const Interactions: Interaction[] = [
     ephemeral: true,
     function: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       let deleted = 0;
+      let failed = false;
       const after = body.data.target_id;
 
       const messages = await getChannelMessages(context, body.channel_id, { after, limit: 100 });
@@ -121,6 +123,7 @@ export const Interactions: Interaction[] = [
           body.channel_id,
           chunk.map((message) => message.id),
         ).catch((error: string) => {
+          failed = true;
           console.log('Failed to delete messages, chunk', index, error);
           return response.status(200).send({
             type: 4,
@@ -133,6 +136,8 @@ export const Interactions: Interaction[] = [
       );
       await Promise.all(promises);
       deleted = messages.length;
+
+      if (!failed && deleted) await trackModAction('delete', context.env);
 
       return response.status(200).send({
         type: 4,

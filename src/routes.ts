@@ -4,7 +4,7 @@ import { Base } from './methods/base';
 import { Interaction } from './methods/interaction';
 import { LanyardPrivacy, LanyardTerms, Privacy, Terms } from './methods/legal';
 import { Metrics } from './methods/metrics';
-import { AllStats, CommandStats, TrackGuilds } from './methods/stats';
+import { AllStats, CommandStats, ErrorStats, EventLogStats, ModStats, TrackGuilds } from './methods/stats';
 import { Internal } from './middlewares/internal';
 import { Verification } from './middlewares/verification';
 
@@ -23,6 +23,9 @@ export const routes: RouteDefinition[] = [
   { route: new Route('/metrics'), method: 'GET', handler: Metrics },
 
   { route: new Route('/stats/guild/:type'), method: 'POST', handler: TrackGuilds, middlewares: [Internal] },
+  { route: new Route('/stats/mod'), method: 'GET', handler: ModStats },
+  { route: new Route('/stats/errors'), method: 'GET', handler: ErrorStats },
+  { route: new Route('/stats/eventlog'), method: 'GET', handler: EventLogStats },
   { route: new Route('/stats/:name'), method: 'GET', handler: CommandStats },
 
   { route: new Route('/interaction'), method: 'POST', handler: Interaction, middlewares: [Verification] },

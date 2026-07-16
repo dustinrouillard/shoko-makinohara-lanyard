@@ -2,20 +2,45 @@ import { Commands } from '../commands';
 import { Env } from '../types/Routes';
 
 async function incrStat(key: string, env: Env): Promise<number> {
-  const current = (Number(await env.Storage.get(key)) || 0) + 1;
-  await env.Storage.put(key, current.toString());
-  return current;
+  try {
+    const current = (Number(await env.Storage.get(key)) || 0) + 1;
+    await env.Storage.put(key, current.toString());
+    return current;
+  } catch {
+    return 0;
+  }
 }
 
 async function getStat(key: string, env: Env): Promise<number> {
   return Number(await env.Storage.get(key)) || 0;
 }
 
+async function listStats(prefix: string, env: Env): Promise<{ name: string; stat: number }[]> {
+  const out: { name: string; stat: number }[] = [];
+  const list = await env.Storage.list({ prefix });
+  for (const key of list.keys) {
+    out.push({ name: key.name.slice(prefix.length), stat: await getStat(key.name, env) });
+  }
+  return out;
+}
+
 export async function trackCommand(name: string, env: Env) {
   return incrStat(`stats/commands:${name}`, env);
 }
 
-export const MOD_ACTIONS = ['op', 'deop', 'mute', 'support_mute', 'unmute', 'support_unmute', 'kick'] as const;
+export async function trackInteraction(kind: 'component' | 'modal', id: string, env: Env) {
+  return incrStat(`stats/interactions:${kind}:${id}`, env);
+}
+
+export async function trackServiceError(service: string, env: Env) {
+  return incrStat(`stats/external_errors:${service}`, env);
+}
+
+export async function getServiceErrorStats(env: Env): Promise<{ name: string; stat: number }[]> {
+  return listStats('stats/external_errors:', env);
+}
+
+export const MOD_ACTIONS = ['op', 'deop', 'mute', 'support_mute', 'unmute', 'support_unmute', 'kick', 'delete', 'phash_report'] as const;
 
 export async function trackModAction(action: string, env: Env) {
   return incrStat(`stats/mod:${action}`, env);
@@ -36,8 +61,19 @@ export async function getErrorTotal(env: Env): Promise<number> {
   return getStat(`stats/errors:_all`, env);
 }
 
+export async function getErrorStats(env: Env): Promise<{ name: string; stat: number }[]> {
+  return listStats('stats/errors:', env);
+}
+
 export async function trackEventLog(outcome: 'success' | 'failure', env: Env) {
   return incrStat(`stats/eventlog:${outcome}`, env);
+}
+
+export async function getEventLogStats(env: Env): Promise<{ success: number; failure: number }> {
+  return {
+    success: await getStat('stats/eventlog:success', env),
+    failure: await getStat('stats/eventlog:failure', env),
+  };
 }
 
 export async function getCommandStats(name: string, env: Env): Promise<number> {

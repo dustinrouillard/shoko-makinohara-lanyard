@@ -3,7 +3,7 @@ import { ComponentHandlers, Context, Interaction, Interactions, ModalHandlers } 
 import type { DiscordInteraction, User } from '../types/Interaction';
 import { Embed, MessageFlags } from '../types/Message';
 import type { CraftedResponse, ParsedRequest } from '../types/Routes';
-import { trackCommand, trackError } from '../utils/stats';
+import { trackCommand, trackError, trackInteraction } from '../utils/stats';
 
 export async function processCommand(name: string, body: DiscordInteraction, request: ParsedRequest, response: CraftedResponse) {
   let command: Command | Interaction | undefined;
@@ -12,7 +12,7 @@ export async function processCommand(name: string, body: DiscordInteraction, req
 
   if (!command) return response.status(400).send('invalid request');
 
-  await trackCommand(name, request.env);
+  request.waitUntil(trackCommand(name, request.env).catch(() => {}));
 
   const ephemeral = typeof command.ephemeral == 'undefined' || command.ephemeral;
   const in_mod_channel = !!request.env.MOD_CHANNEL_ID && body.channel_id === request.env.MOD_CHANNEL_ID;
@@ -21,24 +21,24 @@ export async function processCommand(name: string, body: DiscordInteraction, req
 
   const user = (body.member?.user || body.user) as User;
 
-  let context: Context = { env: request.env };
-  if (command.prehandler) context = await command.prehandler(context, body, user);
-
-  if ('error' in context) {
-    const error = context.error as Partial<Embed>;
-    return response.status(200).send({
-      type: 4,
-      data: {
-        flags,
-        content: command.content,
-        embeds: [error],
-      },
-    });
-  }
-
-  const components = command.components ? [{ type: 1, components: await command.components(context, body, user) }] : undefined;
-
   try {
+    let context: Context = { env: request.env };
+    if (command.prehandler) context = await command.prehandler(context, body, user);
+
+    if ('error' in context) {
+      const error = context.error as Partial<Embed>;
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags,
+          content: command.content,
+          embeds: [error],
+        },
+      });
+    }
+
+    const components = command.components ? [{ type: 1, components: await command.components(context, body, user) }] : undefined;
+
     if (command.function) {
       return await command.function(context, body, user, response);
     } else if (command.embed) {
@@ -75,6 +75,8 @@ async function processComponent(body: DiscordInteraction, request: ParsedRequest
   const handler = ComponentHandlers.find((c) => customId === c.custom_id || customId.startsWith(`${c.custom_id}:`));
   if (!handler) return response.status(400).send('invalid request');
 
+  request.waitUntil(trackInteraction('component', handler.custom_id, request.env).catch(() => {}));
+
   const user = (body.member?.user || body.user) as User;
   const context: Context = { env: request.env };
 
@@ -91,6 +93,8 @@ async function processModal(body: DiscordInteraction, request: ParsedRequest, re
   const customId = body.data.custom_id ?? '';
   const handler = ModalHandlers.find((m) => customId === m.custom_id || customId.startsWith(`${m.custom_id}:`));
   if (!handler) return response.status(400).send('invalid request');
+
+  request.waitUntil(trackInteraction('modal', handler.custom_id, request.env).catch(() => {}));
 
   const user = (body.member?.user || body.user) as User;
   const context: Context = { env: request.env, waitUntil: request.waitUntil };
@@ -111,21 +115,21 @@ export async function Interaction(request: ParsedRequest<{ Body: DiscordInteract
     }
     case 2: {
       try {
-        return processCommand(request.body.data.name, request.body, request, response);
+        return await processCommand(request.body.data.name, request.body, request, response);
       } catch (error: any) {
         return response.status(400).send(error.toString());
       }
     }
     case 3: {
       try {
-        return processComponent(request.body, request, response);
+        return await processComponent(request.body, request, response);
       } catch (error: any) {
         return response.status(400).send(error.toString());
       }
     }
     case 5: {
       try {
-        return processModal(request.body, request, response);
+        return await processModal(request.body, request, response);
       } catch (error: any) {
         return response.status(400).send(error.toString());
       }

@@ -2,6 +2,7 @@ import { stringify } from 'node:querystring';
 import type { Message, User } from '../types/Discord';
 import type { Member } from '../types/Interaction';
 import type { Env } from '../types/Routes';
+import { trackServiceError } from './stats';
 
 export const DISCORD_EPOCH = 1420070400000;
 
@@ -64,6 +65,7 @@ export async function deleteChannelMessage(context: Record<string, any> & { env:
     method: 'DELETE',
     headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
   });
+  if (res.status !== 204) await trackServiceError('discord', context.env);
   return res.status === 204;
 }
 
@@ -87,10 +89,11 @@ export async function kickGuildMember(context: Record<string, any> & { env: Env 
     method: 'DELETE',
     headers,
   });
+  if (res.status !== 204) await trackServiceError('discord', context.env);
   return res.status === 204;
 }
 
-export async function bulkDeleteMessages(context: Record<string, any> & { env: Env }, id: string, messages: string[]): Promise<Response> {
+export async function bulkDeleteMessages(context: Record<string, any> & { env: Env }, id: string, messages: string[], attempt = 0): Promise<Response> {
   const req = await fetch(`https://discord.com/api/v9/channels/${id}/messages/bulk-delete`, {
     method: 'POST',
     body: JSON.stringify({ messages }),
@@ -101,9 +104,13 @@ export async function bulkDeleteMessages(context: Record<string, any> & { env: E
     const body: { code: number; retry_after?: number } = await req.json();
 
     if ('retry_after' in body) {
+      await trackServiceError('discord_ratelimit', context.env);
+      if (attempt >= 3) throw `Failed to delete messages, report to Dustin`;
       await new Promise((resolve) => setTimeout(resolve, (body.retry_after ?? 1) * 1000));
-      return await bulkDeleteMessages(context, id, messages);
+      return await bulkDeleteMessages(context, id, messages, attempt + 1);
     }
+
+    await trackServiceError('discord', context.env);
 
     if (body.code === 50034) {
       throw `Failed to delete messages as there are messages older than 2 weeks in your selection`;
@@ -115,26 +122,32 @@ export async function bulkDeleteMessages(context: Record<string, any> & { env: E
   return req;
 }
 
-export async function addRoleToUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string) {
+export async function addRoleToUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string): Promise<boolean> {
   const req = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/members/${user_id}/roles/${role_id}`, {
     method: 'PUT',
     headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
   });
 
-  if (req.status != 204) return null;
+  if (req.status != 204) {
+    await trackServiceError('discord', context.env);
+    return false;
+  }
 
-  return;
+  return true;
 }
 
-export async function removeRoleFromUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string) {
+export async function removeRoleFromUser(context: Record<string, any> & { env: Env }, user_id: string, role_id: string): Promise<boolean> {
   const req = await fetch(`https://discord.com/api/guilds/${context.env.GUILD_ID}/members/${user_id}/roles/${role_id}`, {
     method: 'DELETE',
     headers: { authorization: `Bot ${context.env.DISCORD_TOKEN}` },
   });
 
-  if (req.status != 204) return null;
+  if (req.status != 204) {
+    await trackServiceError('discord', context.env);
+    return false;
+  }
 
-  return;
+  return true;
 }
 
 export async function getGuildMember(context: Record<string, any> & { env: Env }, user_id: string) {

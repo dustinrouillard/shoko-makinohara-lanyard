@@ -59,6 +59,8 @@ export async function sendPhashReportEvent(
   env: Env,
   data: { actor: string; message_link: string; type: string; reason: string; added: number; duplicates: number; errors: number; phashes: string },
 ) {
+  await trackModAction('phash_report', env);
+
   const phashesValue = data.phashes.length > 1024 ? `${data.phashes.slice(0, 1020)}…` : data.phashes;
   const embed = {
     title: 'Images reported to pHash automod',
