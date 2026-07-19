@@ -603,7 +603,11 @@ export const Commands: Command[] = [
       const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
       const lanyard = await fetchLanyardUser(id, context.env);
       return {
-        title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}#${lanyard?.data?.discord_user.discriminator}`,
+        title: `Lanyard K/V for ${lanyard?.data?.discord_user.username}${
+          lanyard?.data?.discord_user.discriminator && lanyard.data.discord_user.discriminator !== '0'
+            ? `#${lanyard.data.discord_user.discriminator}`
+            : ''
+        }`,
         description: `Current Lanyard K/V Items\n\n\`\`\`json\n${
           lanyard?.data?.kv ? JSON.stringify(lanyard.data.kv, null, 2) : '{}'
         }\n\`\`\`\nTo access a key within a script, pull your Lanyard object [\`api.lanyard.rest/v1/users/${id}\`](https://api.lanyard.rest/v1/users/${id})\nand the json path is\`.data.kv.KEY_NAME\`\nwhen using the socket it will be \`.d.kv.KEY_NAME\`\nThe \`.\` referencing the root of your JSON response\n\nYou can set K/V items by reading the help with \`.kv\``,
