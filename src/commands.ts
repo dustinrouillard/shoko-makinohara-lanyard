@@ -15,6 +15,7 @@ import {
   getLanyardMember,
   idToTimestamp,
   removeRoleFromUser,
+  setChannelSlowmode,
 } from './utils/discord';
 import { chunk } from './utils/array';
 import { Message } from './types/Discord';
@@ -390,6 +391,36 @@ export const Commands: Command[] = [
           content: `Done ✅ \`Removed ${deleted.length.toLocaleString()} messages\``,
         },
       });
+    },
+  },
+  {
+    command: 'slowmode',
+    description: 'Sets slowmode in the current channel',
+    function: async (context: Context, body: DiscordInteraction, _, response: CraftedResponse) => {
+      const timer = Number(body.data.options?.find((option) => option.name === 'timer')?.value);
+      const permissions = BigInt(body.member?.permissions ?? 0);
+      const canManageChannel = [BigInt(1) << BigInt(3), BigInt(1) << BigInt(4), BigInt(1) << BigInt(34)].some(
+        (permission) => (permissions & permission) === permission,
+      );
+      const reply = (content: string) =>
+        response.status(200).send({
+          type: 4,
+          data: {
+            flags: MessageFlags.Ephemeral,
+            content,
+          },
+        });
+
+      if (!canManageChannel) return reply(':x: You do not have permission to manage this channel.');
+
+      if (!Number.isInteger(timer) || timer < 0 || timer > 21_600) {
+        return reply('Timer must be a whole number of seconds between 0 and 21,600. Use 0 to disable slowmode.');
+      }
+
+      const updated = await setChannelSlowmode(context, body.channel_id, timer);
+      if (!updated) return reply('Failed to update slowmode. Make sure I have permission to manage this channel.');
+
+      return reply(timer === 0 ? '✅ Slowmode disabled in this channel.' : `✅ Slowmode set to ${timer.toLocaleString()} seconds in this channel.`);
     },
   },
   {
