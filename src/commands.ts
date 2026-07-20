@@ -398,10 +398,6 @@ export const Commands: Command[] = [
     description: 'Sets slowmode in the current channel',
     function: async (context: Context, body: DiscordInteraction, _, response: CraftedResponse) => {
       const timer = Number(body.data.options?.find((option) => option.name === 'timer')?.value);
-      const permissions = BigInt(body.member?.permissions ?? 0);
-      const canManageChannel = [BigInt(1) << BigInt(3), BigInt(1) << BigInt(4), BigInt(1) << BigInt(34)].some(
-        (permission) => (permissions & permission) === permission,
-      );
       const reply = (content: string) =>
         response.status(200).send({
           type: 4,
@@ -410,8 +406,6 @@ export const Commands: Command[] = [
             content,
           },
         });
-
-      if (!canManageChannel) return reply(':x: You do not have permission to manage this channel.');
 
       if (!Number.isInteger(timer) || timer < 0 || timer > 21_600) {
         return reply('Timer must be a whole number of seconds between 0 and 21,600. Use 0 to disable slowmode.');
