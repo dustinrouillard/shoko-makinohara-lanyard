@@ -21,6 +21,8 @@ import { chunk } from './utils/array';
 import { Message } from './types/Discord';
 import { EventType, sendUserEvent } from './utils/events';
 import { automod, listServerTagMembers, normalizeType, PhashListResponse, validatePhash } from './utils/automod';
+import { fetchDcdnProfile } from './utils/dcdn';
+import { resolveTieredBadges } from './utils/badges';
 
 export type Context = Record<string, any> & { env: Env };
 
@@ -618,6 +620,60 @@ export const Commands: Command[] = [
           color: 0x726311,
         };
       }
+    },
+  },
+  {
+    command: 'badges',
+    description: 'Returns your tiered Discord profile badges',
+    post_channels: ['911712979291086919', '927757958010503171'],
+    embed: async (context: Context, body: DiscordInteraction, user: User) => {
+      const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
+
+      const profile = await fetchDcdnProfile(id, context.env);
+      if (!profile)
+        return {
+          title: 'Profile Badges',
+          description: 'Failed to look up that profile, try again later',
+          color: 0x726311,
+        };
+
+      if (!profile.profile.user)
+        return {
+          title: 'Profile Badges',
+          description: "That user doesn't exist, or their profile isn't available",
+          color: 0x726311,
+        };
+
+      const { user: discord } = profile.profile;
+      const badges = resolveTieredBadges(profile.badges);
+
+      const lines = badges.map((badge) => {
+        const details = [badge.info, badge.next ? `next: ${badge.next}` : null].filter(Boolean).join(' · ');
+        return `${badge.emoji} **${badge.name}** — ${badge.tier_name} *(tier ${badge.tier}/10)*${details ? `\n> ${details}` : ''}`;
+      });
+
+      const created = ~~(idToTimestamp(id).getTime() / 1000);
+      // NaN and black both fall through to blurple, an all black embed reads as broken
+      const banner = discord.banner_color ? parseInt(discord.banner_color.replace('#', ''), 16) : NaN;
+      const accent = discord.accent_color || banner || 0x5865f2;
+
+      return {
+        title: 'New Profile Badges',
+        author: {
+          name: discord.discriminator == '0' ? `${discord.global_name ?? discord.username} (@${discord.username})` : `${discord.username}#${discord.discriminator}`,
+          ...(discord.avatar ? { icon_url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}` } : {}),
+        },
+        description: lines.length ? lines.join('\n\n') : "*No tiered badges yet — they show up once you've been around, played some games, or streamed a little.*",
+        fields: [
+          {
+            name: '☀️ Account Creation',
+            value: `<t:${created}> (<t:${created}:R>)`,
+          },
+        ],
+        ...(discord.avatar ? { thumbnail: { url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}` } } : {}),
+        footer: { text: `ID: ${discord.id}` },
+        color: accent,
+      };
     },
   },
   {

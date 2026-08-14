@@ -66,7 +66,9 @@ type PageOptions = {
   body: string;
 };
 
-const LAST_UPDATED = '2026-06-11';
+const LAST_UPDATED = '2026-07-29';
+
+const CONTACT_EMAIL = 'shoko@dstn.to';
 
 function footer(activePath: string): string {
   const link = (href: string, label: string) =>
@@ -139,6 +141,8 @@ const SHOKO_TERMS_BODY = `
     <li>Responds to slash commands and context menu interactions issued in the Lanyard server (status lookups, stats, project listings, moderator tools, etc.).</li>
     <li>Performs automated moderation on messages sent in the Lanyard server (scam-image perceptual hash matching and cross-channel duplicate detection).</li>
     <li>Persists moderator-issued mute state so the muted role is re-applied if a muted user leaves and rejoins the server.</li>
+    <li>Resets server nicknames that begin with member-list &ldquo;hoisting&rdquo; characters, so accounts cannot force themselves to the top of the member list.</li>
+    <li>Announces member-count milestones in a public channel.</li>
     <li>Maintains an in-memory cache of which members are currently displaying the Lanyard server's tag (clan tag), used by the public <code>/tag</code> command to show a count.</li>
     <li>Posts moderation audit events to a private staff channel.</li>
   </ul>
@@ -163,11 +167,15 @@ const SHOKO_TERMS_BODY = `
     reposted in multiple channels within a short window).
   </p>
   <p>
-    When a hit is found, the offending user is removed from the server
-    with their recent messages deleted &mdash; a &ldquo;soft-ban&rdquo;
-    (a ban issued to wipe recent messages, immediately followed by an
-    unban so the user is not permanently barred). All automod actions
-    are logged to a private moderator channel for review.
+    When a hit is found, the offending messages are deleted and the account is
+    actioned. For most accounts this is a &ldquo;soft-ban&rdquo; &mdash; a ban
+    issued to wipe recent messages, immediately followed by an unban, so the
+    account is evicted but not permanently barred and can rejoin. Members
+    holding trusted server roles are instead given a temporary timeout, so a
+    false positive or a compromised-but-recoverable account keeps its place and
+    standing in the server. Staff roles and specifically exempted accounts are
+    not subject to automated moderation at all. All automod actions are logged
+    to a private moderator channel for review.
   </p>
   <p>
     When automod fires on a message whose attachments do not match an
@@ -250,6 +258,19 @@ const SHOKO_PRIVACY_BODY = `
       captured.
     </li>
     <li>
+      <strong>Member roles</strong> &mdash; your roles in the Lanyard server
+      are read on each message and on member updates, to determine whether you
+      are exempt from automated moderation (staff roles and per-user
+      exemptions) and, if not, which moderation action applies. Roles are
+      read live from Discord and not stored.
+    </li>
+    <li>
+      <strong>Display name</strong> &mdash; your nickname, global display name,
+      and username are checked when you join and when your profile changes, so
+      that a name starting with a member-list &ldquo;hoisting&rdquo; character
+      can have its server nickname reset. Names are read live and not stored.
+    </li>
+    <li>
       <strong>Interaction metadata</strong> &mdash; when you invoke a slash
       command or context menu action in the Lanyard server, Discord provides
       your user ID and the command parameters so the bot can respond. This
@@ -291,40 +312,157 @@ const SHOKO_PRIVACY_BODY = `
     <li>Monitoring service health.</li>
   </ul>
 
+  <h2>Privileged Discord intents we use, and why</h2>
+  <p>
+    Shoko Makinohara requests two privileged gateway intents from Discord.
+    Each is used only for the purpose described here:
+  </p>
+  <ul>
+    <li>
+      <strong>Message Content</strong> &mdash; required to inspect messages
+      posted in the Lanyard server for automated scam and spam moderation.
+      The bot reads message text and attached/embedded images so it can
+      perceptually hash images against a known-scam database and detect the
+      same message being posted across multiple channels in a short window.
+      Discord's built-in AutoMod cannot match images or correlate posts
+      across channels, which is what the scam waves hitting this server
+      actually do.
+    </li>
+    <li>
+      <strong>Guild Members</strong> &mdash; required to read member roles and
+      display names. Roles determine moderation exemptions (staff and trusted
+      roles) and which moderation action applies; display names are checked on
+      join and on update so that names beginning with member-list
+      &ldquo;hoisting&rdquo; characters can be reset. It is also used to
+      re-apply a muted role when a muted member rejoins, to maintain the
+      server-tag count, and to announce member-count milestones.
+    </li>
+  </ul>
+
   <h2>Sharing</h2>
   <p>
-    Shoko Makinohara does not sell data and does not share it with third
-    parties beyond what is required to run the service (Discord, Cloudflare).
-    Moderation audit entries are only visible to Lanyard server staff.
+    Shoko Makinohara does not sell data, does not share it with advertisers or
+    data brokers, and does not share it with third parties beyond the
+    infrastructure required to run the service (Discord, Cloudflare, and the
+    operator's own hosting). Moderation audit entries are only visible to
+    Lanyard server staff.
   </p>
 
-  <h2>Retention &amp; deletion</h2>
+  <h2>Machine learning &amp; AI</h2>
   <p>
-    Message content is processed in memory and not retained, except where
-    referenced by a moderation audit entry. Attachments re-uploaded to
-    the moderator review channel are retained at staff discretion as
-    part of the scam-sample collection. Moderation audit entries may be
-    retained for the Lanyard server's moderation history. Operational
-    metrics are aggregate and do not identify individual users.
+    No data processed by Shoko Makinohara &mdash; message content included
+    &mdash; is used to train, fine-tune, or evaluate machine learning or AI
+    models, and none is sold or provided to any third party for that purpose.
+    The scam-image database stores only non-reversible perceptual hashes
+    (a short fingerprint per image); it is a lookup table, not a model, and
+    the original images cannot be reconstructed from it.
   </p>
+
+  <h2>Storage &amp; security</h2>
   <p>
-    Leaving the Lanyard server stops further data collection by the bot.
-    Mute state is the one intentional exception: if you leave while
-    muted, the record persists so the muted role can be re-applied on
-    rejoin, and is cleared once a moderator removes the mute. The
-    server-tag cache entry for your account is removed as soon as you
-    leave or stop displaying the tag.
+    Data held outside Discord is limited to what is listed below and is kept
+    in a private datastore on operator-controlled infrastructure, reachable
+    only over authenticated, encrypted connections and not exposed publicly.
+    Data at rest is encrypted, and access is restricted to the operator.
+    The bot's management API requires a bearer token on every request.
+  </p>
+  <ul>
+    <li>
+      <strong>Mute state</strong> &mdash; your numeric Discord user ID and a
+      flag, for as long as a moderator-issued mute is active.
+    </li>
+    <li>
+      <strong>Scam-image perceptual hashes</strong> &mdash; image fingerprints
+      and a label. Not linked to any user.
+    </li>
+    <li>
+      <strong>Operational logs and aggregate counters</strong> &mdash;
+      short-lived diagnostic logs and non-identifying usage totals.
+    </li>
+  </ul>
+
+  <h2>Retention &amp; deletion</h2>
+  <ul>
+    <li>
+      <strong>Message content</strong> is held only in memory for the moments
+      needed to evaluate it: duplicate-detection state is discarded after
+      45 seconds, and the post-action suppression window after 120 seconds.
+      Nothing is written to a database, and all of it is lost on restart.
+      Where a message that triggered a detection appears in short-lived
+      diagnostic logs, those logs are retained for <strong>30 days or
+      less</strong>.
+    </li>
+    <li>
+      <strong>Member data</strong> (roles, display names, server-tag status)
+      is held in memory only, rebuilt from Discord on restart, and dropped as
+      soon as you leave the server or stop displaying the tag. It is never
+      written to a database.
+    </li>
+    <li>
+      <strong>Mute state</strong> is the one record intentionally kept beyond
+      a session, because its whole purpose is to survive you leaving: it is a
+      single numeric user ID stored while a moderator-issued mute is active,
+      so the mute cannot be bypassed by leaving and rejoining. It is deleted
+      as soon as a moderator removes the mute, and may therefore be retained
+      for longer than 30 days if the mute lasts that long.
+    </li>
+    <li>
+      <strong>Moderation audit entries</strong> live in a private Discord
+      staff channel and are retained as part of the server's moderation
+      history. They record a user ID, channel, and what was detected &mdash;
+      not message text.
+    </li>
+    <li>
+      <strong>Attachments</strong> re-uploaded to the private moderator review
+      channel are retained at staff discretion as scam samples, and are
+      deleted once their perceptual hash has been recorded or the sample is
+      judged not to be a scam.
+    </li>
+    <li>
+      <strong>Operational metrics</strong> are aggregate counters that do not
+      identify individual users.
+    </li>
+  </ul>
+  <p>
+    Leaving the Lanyard Discord server stops all further data collection by
+    the bot, and clears the in-memory member and server-tag data held about
+    you.
   </p>
 
   <h2>Your choices</h2>
   <ul>
     <li>Leave the Lanyard Discord server to stop all data collection by Shoko Makinohara.</li>
     <li>Stop invoking the bot's commands to avoid contributing to interaction processing or usage counters.</li>
+    <li>Request deletion of data held about you, as described below.</li>
   </ul>
+  <p>
+    Automated scam and spam moderation applies to every message posted in the
+    Lanyard server and cannot be individually opted out of &mdash; an opt-out
+    would let scam and spam accounts exempt themselves, which would defeat the
+    protection for everyone else. Choosing not to participate means choosing
+    not to post in the Lanyard server; leaving it stops all processing.
+  </p>
+
+  <h2>Requesting deletion of your data</h2>
+  <p>
+    You can request deletion of any data held about you, or ask what is held,
+    by emailing <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> from
+    any address, or by contacting the operator or staff directly in the
+    Lanyard Discord server. Include your Discord user ID so the request can be
+    matched. Requests are actioned within 30 days, and normally much sooner.
+  </p>
+  <p>
+    Note that most of what the bot processes is not retained at all, so in
+    practice a deletion request covers your mute record, any moderation audit
+    entries, and any scam samples captured from your messages.
+  </p>
 
   <h2>Contact</h2>
   <p>
-    Questions about this policy can be raised in the Lanyard Discord server.
+    This service is operated by Dustin Rouillard. Questions about this policy,
+    data requests, and complaints can be sent to
+    <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> or raised in the
+    Lanyard Discord server.
   </p>
 `;
 
@@ -480,9 +618,22 @@ const LANYARD_PRIVACY_BODY = `
     <li>Avoid putting sensitive information in KV entries, since they are publicly readable.</li>
   </ul>
 
+  <h2>Requesting deletion of your data</h2>
+  <p>
+    Leaving the Lanyard Discord server deletes all data the service holds
+    about you. You can also request deletion, or ask what is held, by emailing
+    <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> or by contacting the
+    operator or staff in the Lanyard Discord server. Include your Discord user
+    ID so the request can be matched. Requests are actioned within 30 days,
+    and normally much sooner.
+  </p>
+
   <h2>Contact</h2>
   <p>
-    Questions about this policy can be raised in the Lanyard Discord server.
+    This service is operated by Dustin Rouillard. Questions about this policy,
+    data requests, and complaints can be sent to
+    <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> or raised in the
+    Lanyard Discord server.
   </p>
 `;
 
