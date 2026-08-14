@@ -6,6 +6,7 @@ export enum MessageFlags {
   Urgent = 1 << 4,
   Ephemeral = 1 << 6,
   Loading = 1 << 7,
+  ComponentsV2 = 1 << 15,
 }
 
 export interface DiscordMessage {

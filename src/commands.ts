@@ -626,23 +626,29 @@ export const Commands: Command[] = [
     command: 'badges',
     description: 'Returns your tiered Discord profile badges',
     post_channels: ['911712979291086919', '927757958010503171'],
-    embed: async (context: Context, body: DiscordInteraction, user: User) => {
+    function: async (context: Context, body: DiscordInteraction, user: User, response: CraftedResponse) => {
       const id = (body.data.options?.find((item) => item.name == 'user')?.value as string) || user.id;
 
       const profile = await fetchDcdnProfile(id, context.env);
       if (!profile)
-        return {
-          title: 'Profile Badges',
-          description: 'Failed to look up that profile, try again later',
-          color: 0x726311,
-        };
+        return response.status(200).send({
+          type: 4,
+          data: {
+            title: 'Profile Badges',
+            description: 'Failed to look up that profile, try again later',
+            color: 0x726311,
+          }
+        });
 
       if (!profile.profile.user)
-        return {
-          title: 'Profile Badges',
-          description: "That user doesn't exist, or their profile isn't available",
-          color: 0x726311,
-        };
+        return response.status(200).send({
+          type: 4,
+          data: {
+            title: 'Profile Badges',
+            description: "That user doesn't exist, or their profile isn't available",
+            color: 0x726311,
+          }
+        });
 
       const { user: discord } = profile.profile;
       const badges = resolveTieredBadges(profile.badges);
@@ -657,23 +663,42 @@ export const Commands: Command[] = [
       const banner = discord.banner_color ? parseInt(discord.banner_color.replace('#', ''), 16) : NaN;
       const accent = discord.accent_color || banner || 0x5865f2;
 
-      return {
-        title: 'New Profile Badges',
-        author: {
-          name: discord.discriminator == '0' ? `${discord.global_name ?? discord.username} (@${discord.username})` : `${discord.username}#${discord.discriminator}`,
-          ...(discord.avatar ? { icon_url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}` } : {}),
-        },
-        description: lines.length ? lines.join('\n\n') : "*No tiered badges yet — they show up once you've been around, played some games, or streamed a little.*",
-        fields: [
-          {
-            name: '☀️ Account Creation',
-            value: `<t:${created}> (<t:${created}:R>)`,
-          },
-        ],
-        ...(discord.avatar ? { thumbnail: { url: `https://cdn.discordapp.com/avatars/${discord.id}/${discord.avatar}` } } : {}),
-        footer: { text: `ID: ${discord.id}` },
-        color: accent,
-      };
+      return response.status(200).send({
+        type: 4,
+        data: {
+          flags: MessageFlags.ComponentsV2 | MessageFlags.Ephemeral,
+          components: [
+            {
+              type: 17,
+              components: [
+                {
+                  type: 10,
+                  content: "## New Profile Badges"
+                },
+                {
+                  type: 10,
+                  content: lines.length ? lines.join('\n\n') : "*No tiered badges yet — they show up once you've been around, played some games, or streamed a little.*",
+                },
+                {
+                  type: 10,
+                  content: `*Account Created <t:${created}> (<t:${created}:R>)*`
+                },
+                {
+                  type: 1,
+                  components: [
+                    {
+                      type: 2,
+                      style: 5,
+                      label: "View dcdn Profile Card",
+                      url: `https://dcdn.dstn.to/card/${discord.id}`,
+                    }
+                  ]
+                },
+              ]
+            }
+          ]
+        }
+      });
     },
   },
   {
